@@ -1,6 +1,6 @@
-package com.object.ai.craft.common;
+package com.object.ai.craft.types.common;
 
-import com.object.ai.craft.exception.ErrorCode;
+import com.object.ai.craft.types.exception.ErrorCode;
 
 /**
  * 响应返回工具类

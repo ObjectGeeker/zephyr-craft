@@ -1,4 +1,4 @@
-package com.object.ai.craft.exception;
+package com.object.ai.craft.types.exception;
 
 import lombok.Getter;
 

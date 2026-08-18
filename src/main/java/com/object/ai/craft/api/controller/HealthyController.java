@@ -1,7 +1,7 @@
-package com.object.ai.craft.controller;
+package com.object.ai.craft.api.controller;
 
-import com.object.ai.craft.common.BaseResponse;
-import com.object.ai.craft.common.ResultUtil;
+import com.object.ai.craft.types.common.BaseResponse;
+import com.object.ai.craft.types.common.ResultUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;

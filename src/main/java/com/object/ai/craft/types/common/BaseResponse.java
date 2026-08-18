@@ -1,4 +1,4 @@
-package com.object.ai.craft.common;
+package com.object.ai.craft.types.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -7,7 +7,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
 @SpringBootApplication
 @EnableAspectJAutoProxy
-@MapperScan(basePackages = {"com.object.ai.craft.mapper"})
+@MapperScan(basePackages = {"com.object.ai.craft.infrastructure.persistence.mapper"})
 public class Application {
 
     public static void main(String[] args) {

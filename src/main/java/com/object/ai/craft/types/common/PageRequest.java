@@ -1,4 +1,4 @@
-package com.object.ai.craft.common;
+package com.object.ai.craft.types.common;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

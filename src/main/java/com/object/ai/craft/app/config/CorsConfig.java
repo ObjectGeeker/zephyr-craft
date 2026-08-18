@@ -1,4 +1,4 @@
-package com.object.ai.craft.config;
+package com.object.ai.craft.app.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;

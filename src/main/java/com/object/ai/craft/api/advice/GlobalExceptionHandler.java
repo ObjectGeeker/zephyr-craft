@@ -1,7 +1,9 @@
-package com.object.ai.craft.exception;
+package com.object.ai.craft.api.advice;
 
-import com.object.ai.craft.common.BaseResponse;
-import com.object.ai.craft.common.ResultUtil;
+import com.object.ai.craft.types.common.BaseResponse;
+import com.object.ai.craft.types.common.ResultUtil;
+import com.object.ai.craft.types.exception.BusinessException;
+import com.object.ai.craft.types.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;

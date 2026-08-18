@@ -4,8 +4,8 @@ server:
     context-path: /api
 # SpringDoc配置
 springdoc:
-  # 仅扫描controller包下的接口
-  packages-to-scan: com.object.ai.craft.controller
+  # 仅扫描api层controller包下的接口
+  packages-to-scan: com.object.ai.craft.api.controller
   swagger-ui:
     path: /swagger-ui.html
   api-docs:

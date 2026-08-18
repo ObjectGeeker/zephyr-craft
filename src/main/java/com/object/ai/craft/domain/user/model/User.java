@@ -1,21 +1,16 @@
-package com.object.ai.craft.model.entity;
-
-import com.mybatisflex.annotation.Column;
-import com.mybatisflex.annotation.Id;
-import com.mybatisflex.annotation.KeyType;
-import com.mybatisflex.annotation.Table;
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
-import java.io.Serial;
+package com.object.ai.craft.domain.user.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
+import java.io.Serializable;
+import java.time.LocalDateTime;
+
 /**
- * 用户表 实体类。
+ * 用户 领域实体
  *
  * @author Object
  */
@@ -23,7 +18,6 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table("user")
 public class User implements Serializable {
 
     @Serial
@@ -32,7 +26,6 @@ public class User implements Serializable {
     /**
      * 主键ID，32位小写十六进制UUID（无横线等特殊字符）
      */
-    @Id(keyType = KeyType.Generator)
     private String id;
 
     /**
@@ -74,11 +67,5 @@ public class User implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
-
-    /**
-     * 逻辑删除标记：1-已删除，0-未删除
-     */
-    @Column(isLogicDelete = true)
-    private Integer isDelete;
 
 }
