@@ -21,3 +21,4 @@ spring:
     password: hdN3Q46Wd2mW3PFE
     username: zephyr_craft
     url: jdbc:mysql://171.80.4.168:3306/zephyr_craft
+    driver-class-name: com.mysql.cj.jdbc.Driver

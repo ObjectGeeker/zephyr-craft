@@ -16,6 +16,9 @@
         <hutool.version>5.8.47</hutool.version>
         <lombok.version>1.18.46</lombok.version>
         <knife4j.version>4.4.0</knife4j.version>
+        <mysql.version>9.7.0</mysql.version>
+        <mybatis.flex.version>1.11.8</mybatis.flex.version>
+        <hikrai.version>4.0.3</hikrai.version>
     </properties>
 
     <parent>
@@ -40,6 +43,29 @@
             <scope>test</scope>
         </dependency>
 
+        <!--数据库连接 & ORM-->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>${mysql.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.mybatis-flex</groupId>
+            <artifactId>mybatis-flex-spring-boot3-starter</artifactId>
+            <version>${mybatis.flex.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mybatis-flex</groupId>
+            <artifactId>mybatis-flex-codegen</artifactId>
+            <version>${mybatis.flex.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>${hikrai.version}</version>
+        </dependency>
+
         <!--接口文档-->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
@@ -50,7 +76,7 @@
         <!--工具模块-->
         <dependency>
             <groupId>cn.hutool</groupId>
-            <artifactId>hutool-core</artifactId>
+            <artifactId>hutool-all</artifactId>
             <version>${hutool.version}</version>
         </dependency>
         <dependency>
