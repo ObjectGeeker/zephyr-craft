@@ -10,9 +10,14 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
-
 # Knife4j配置
 knife4j:
   enable: true
   setting:
     language: zh_cn
+# 数据库配置
+spring:
+  datasource:
+    password: hdN3Q46Wd2mW3PFE
+    username: zephyr_craft
+    url: jdbc:mysql://171.80.4.168:3306/zephyr_craft
