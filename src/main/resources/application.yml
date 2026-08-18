@@ -1,0 +1,18 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+# SpringDoc配置
+springdoc:
+  # 仅扫描controller包下的接口
+  packages-to-scan: com.object.ai.craft.controller
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# Knife4j配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
