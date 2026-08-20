@@ -17,6 +17,8 @@ knife4j:
     language: zh_cn
 # 数据库配置
 spring:
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     password: hdN3Q46Wd2mW3PFE
     username: zephyr_craft

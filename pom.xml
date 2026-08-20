@@ -48,6 +48,18 @@
             <scope>test</scope>
         </dependency>
 
+        <!--AI 框架-->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <version>1.18.1</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>1.18.1</version>
+        </dependency>
+
         <!--权限认证-->
         <dependency>
             <groupId>cn.dev33</groupId>
