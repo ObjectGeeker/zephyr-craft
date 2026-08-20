@@ -22,6 +22,14 @@ public interface UserRepository {
     boolean save(User user);
 
     /**
+     * 根据账号获取用户。
+     *
+     * @param account 账号
+     * @return 用户，不存在时返回 {@code null}
+     */
+    User getByAccount(String account);
+
+    /**
      * 根据主键删除用户
      *
      * @param id 主键

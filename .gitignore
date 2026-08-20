@@ -34,3 +34,4 @@ build/
 ### Mac OS ###
 .DS_Store
 /.agents/
+/src/main/resources/application-local.yml

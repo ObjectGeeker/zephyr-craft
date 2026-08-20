@@ -27,7 +27,16 @@ public class UserRepositoryImpl implements UserRepository {
 
     @Override
     public boolean save(User user) {
-        return userMapper.insert(toPO(user)) > 0;
+        // 使用 insertSelective 忽略 null 字段，交由数据库默认值填充（如 create_time）
+        return userMapper.insertSelective(toPO(user)) > 0;
+    }
+
+    @Override
+    public User getByAccount(String account) {
+        UserPO userPO = userMapper.selectOneByQuery(
+                QueryWrapper.create().eq(UserPO::getAccount, account)
+        );
+        return toDomain(userPO);
     }
 
     @Override

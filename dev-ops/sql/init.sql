@@ -12,7 +12,6 @@ CREATE TABLE `user` (
     `role`        VARCHAR(32)  NOT NULL DEFAULT 'user' COMMENT '角色',
     `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_delete`   TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除标记：1-已删除，0-未删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_account` (`account`),
     -- 经常查询的字段单独加索引

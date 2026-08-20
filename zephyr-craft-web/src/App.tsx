@@ -1,8 +1,12 @@
+import { Route, Routes } from 'react-router-dom'
 import TopNav from './components/TopNav'
 import Hero from './components/Hero'
 import CaseShowcase from './components/CaseShowcase'
+import LoginPage from './pages/LoginPage'
+import AdminPage from './pages/AdminPage'
+import { UserProvider } from './store/user'
 
-function App() {
+function HomePage() {
   return (
     <div className="page-glow flex h-dvh flex-col overflow-hidden">
       <TopNav />
@@ -11,6 +15,18 @@ function App() {
         <CaseShowcase />
       </main>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <UserProvider>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+      </Routes>
+    </UserProvider>
   )
 }
 

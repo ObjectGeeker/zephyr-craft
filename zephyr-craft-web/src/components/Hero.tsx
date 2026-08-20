@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
+import { useUser } from '../store/useUser'
 
 const QUICK_PROMPTS = [
   { label: '企业官网', prompt: '帮我搭建一个现代简约风格的企业官网' },
@@ -11,9 +13,15 @@ const QUICK_PROMPTS = [
 export default function Hero() {
   const [value, setValue] = useState('')
   const reduceMotion = useReducedMotion()
+  const navigate = useNavigate()
+  const { currentUser } = useUser()
 
   const handleSubmit = () => {
     if (!value.trim()) return
+    if (!currentUser) {
+      navigate('/login')
+      return
+    }
     console.log('提交建站描述:', value.trim())
   }
 

@@ -1,6 +1,5 @@
 package com.object.ai.craft.infrastructure.persistence.po;
 
-import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
@@ -74,11 +73,5 @@ public class UserPO implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
-
-    /**
-     * 逻辑删除标记：1-已删除，0-未删除
-     */
-    @Column(isLogicDelete = true)
-    private Integer isDelete;
 
 }
