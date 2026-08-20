@@ -3,7 +3,8 @@ package com.object.ai.craft.domain.agent.core;
 import com.object.ai.craft.domain.agent.model.CodeGenEnum;
 import com.object.ai.craft.domain.agent.model.HtmlCodeResult;
 import com.object.ai.craft.domain.agent.model.MultiHtmlCodeResult;
-import com.object.ai.craft.domain.agent.parser.HtmlCodeParser;
+import com.object.ai.craft.domain.agent.parser.CodeParserFactory;
+import com.object.ai.craft.domain.agent.saver.CodeFileSaverFactory;
 import com.object.ai.craft.domain.agent.service.AiCodeGeneratorService;
 import com.object.ai.craft.domain.agent.service.AiCodeGeneratorStreamingService;
 import com.object.ai.craft.types.exception.BusinessException;
@@ -29,7 +30,10 @@ public class AiCodeGeneratorFacade {
     private AiCodeGeneratorStreamingService aiCodeGeneratorStreamingService;
 
     @Resource
-    private HtmlCodeParser htmlCodeParser;
+    private CodeParserFactory codeParserFactory;
+
+    @Resource
+    private CodeFileSaverFactory codeFileSaverFactory;
 
     /**
      * 统一入口：根据类型生成并保存代码
@@ -53,7 +57,7 @@ public class AiCodeGeneratorFacade {
     /**
      * 统一流式入口：根据类型返回 AI 生成的原始文本片段。
      *
-     * <p>调用方可在流结束后使用 {@code HtmlCodeParser} 提取单文件 HTML，
+     * <p>调用方可在流结束后通过 {@code CodeParserFactory} 选择策略，提取单文件 HTML，
      * 或提取多文件模式下的 HTML、CSS 和 JavaScript。</p>
      *
      * @param userMessage 用户消息
@@ -136,21 +140,18 @@ public class AiCodeGeneratorFacade {
     }
 
     private File parseAndSaveCode(String fullResponse, CodeGenEnum codeGenEnum) {
-        return switch (codeGenEnum) {
-            case HTML -> CodeFileSaver.saveHtmlCodeResult(htmlCodeParser.parseHtmlCode(fullResponse));
-            case MULTI_FILE -> CodeFileSaver.saveMultiHtmlCodeResult(htmlCodeParser.parse(fullResponse));
-            default -> throw new BusinessException(ErrorCode.PARAMS_ERROR, "不支持的生成类型！");
-        };
+        Object result = codeParserFactory.getParser(codeGenEnum).parse(fullResponse);
+        return codeFileSaverFactory.getSaver(codeGenEnum).save(result);
     }
 
     private File generateAndSaveMultiHtmlCode(String userMessage) {
         MultiHtmlCodeResult multiHtmlCodeResult = aiCodeGeneratorService.generateMultiHtmlCode(userMessage);
-        return CodeFileSaver.saveMultiHtmlCodeResult(multiHtmlCodeResult);
+        return codeFileSaverFactory.getSaver(CodeGenEnum.MULTI_FILE).save(multiHtmlCodeResult);
     }
 
     private File generateAndSaveHtmlCode(String userMessage) {
         HtmlCodeResult htmlCodeResult = aiCodeGeneratorService.generateHtmlCode(userMessage);
-        return CodeFileSaver.saveHtmlCodeResult(htmlCodeResult);
+        return codeFileSaverFactory.getSaver(CodeGenEnum.HTML).save(htmlCodeResult);
     }
 
 }
