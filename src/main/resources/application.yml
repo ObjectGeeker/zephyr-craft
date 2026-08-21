@@ -17,7 +17,9 @@ knife4j:
     language: zh_cn
 # 部署配置
 deploy:
-  nginx-base-url: http://localhost:8082
+  # 站点访问基础地址：生产环境填 nginx 地址（如 http://localhost:8082），
+  # 开发环境指向后端自身静态托管（PreviewResourceConfig）即可免 nginx 预览
+  nginx-base-url: http://localhost:8080/api
 # 数据库配置
 spring:
   config:

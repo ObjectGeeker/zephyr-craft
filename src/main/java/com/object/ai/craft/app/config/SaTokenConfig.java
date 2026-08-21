@@ -15,7 +15,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new SaInterceptor())
                 .addPathPatterns("/**")
-                .excludePathPatterns("/user/login", "/user/register");
+                // /sites/** 为部署产物静态预览，iframe 跨源加载不携带 cookie，凭不可猜测的 deployKey 控制访问
+                .excludePathPatterns("/user/login", "/user/register", "/sites/**");
     }
 
 }
