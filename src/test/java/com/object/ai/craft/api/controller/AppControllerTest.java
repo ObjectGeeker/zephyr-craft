@@ -1,5 +1,6 @@
 package com.object.ai.craft.api.controller;
 
+import com.object.ai.craft.api.model.app.AppBatchSaveRequest;
 import com.object.ai.craft.api.model.app.AppPageRequest;
 import com.object.ai.craft.api.model.app.AppVO;
 import com.object.ai.craft.domain.app.model.App;
@@ -8,6 +9,7 @@ import com.object.ai.craft.domain.app.service.AppService;
 import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.domain.user.service.UserService;
 import com.object.ai.craft.types.common.BaseResponse;
+import com.object.ai.craft.types.common.DataContainer;
 import com.object.ai.craft.types.common.PageResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,12 +17,18 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.bind.annotation.PostMapping;
 
+import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -83,6 +91,24 @@ class AppControllerTest {
         assertEquals("用户", result.getUser().getUsername());
         assertNull(result.getInitPrompt());
         verify(appService).pageFeatured(request);
+    }
+
+    @Test
+    void batchSaveAdminShouldReplaceSingleAdministratorWriteEndpoints() throws NoSuchMethodException {
+        DataContainer<AppBatchSaveRequest> request = new DataContainer<>();
+        when(appService.batchSaveAdmin(request)).thenReturn(true);
+
+        BaseResponse<Boolean> response = appController.batchSaveAdmin(request);
+
+        assertTrue(response.getData());
+        verify(appService).batchSaveAdmin(request);
+        assertFalse(Arrays.stream(AppController.class.getDeclaredMethods())
+                .map(Method::getName)
+                .anyMatch(name -> name.equals("updateByAdmin") || name.equals("removeByAdmin")));
+        Method method = AppController.class.getDeclaredMethod("batchSaveAdmin", DataContainer.class);
+        PostMapping mapping = method.getAnnotation(PostMapping.class);
+        assertNotNull(mapping);
+        assertEquals("admin/batchSave", mapping.value()[0]);
     }
 
 }

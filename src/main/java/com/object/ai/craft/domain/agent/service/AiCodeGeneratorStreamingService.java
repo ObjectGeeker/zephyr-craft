@@ -1,8 +1,7 @@
 package com.object.ai.craft.domain.agent.service;
 
-import reactor.core.publisher.Flux;
-
 import dev.langchain4j.service.SystemMessage;
+import reactor.core.publisher.Flux;
 
 /**
  * AI 代码生成流式服务。

@@ -41,9 +41,23 @@ export const logout = () => request<boolean>({ url: '/user/logout', method: 'pos
 export const getLoginUser = () =>
   request<UserVO>({ url: '/user/getLoginUser', method: 'get' })
 
-/** 与后端 UserUpdateRequest 对齐的用户资料更新请求体。 */
-export interface UserUpdateRequest {
-  id: string
+/** 根据用户 ID 获取公开用户资料，无需管理员权限。 */
+export const getUserById = (id: string) =>
+  request<UserVO>({ url: `/user/getInfo/${id}`, method: 'get' })
+
+/** 与后端 DataContainer<T> 对齐的批量数据容器。 */
+export interface DataContainer<T> {
+  createData: T[]
+  modifyData: T[]
+  removeData: T[]
+}
+
+/** 与后端 UserBatchSaveRequest 对齐的管理员用户批量操作项。 */
+export interface UserBatchSaveRequest {
+  id?: string
+  account?: string
+  password?: string
+  confirmPassword?: string
   username?: string
   avatar?: string
   profile?: string
@@ -59,14 +73,6 @@ export interface UserPageQuery {
 export const adminPageUsers = (params: UserPageQuery) =>
   request<PageResult<UserVO>>({ url: '/user/page', method: 'get', params })
 
-/** 管理员创建普通用户，不创建登录会话。 */
-export const adminCreateUser = (data: RegisterRequest) =>
-  request<UserVO>({ url: '/user/save', method: 'post', data })
-
-/** 管理员更新用户资料（不修改账号、密码和角色）。 */
-export const adminUpdateUser = (data: UserUpdateRequest) =>
-  request<boolean>({ url: '/user/update', method: 'put', data })
-
-/** 管理员删除用户（逻辑删除）。 */
-export const adminRemoveUser = (id: string) =>
-  request<boolean>({ url: `/user/remove/${id}`, method: 'delete' })
+/** 管理员批量保存用户的新增、修改和删除操作。 */
+export const batchSaveAdmin = (data: DataContainer<UserBatchSaveRequest>) =>
+  request<boolean>({ url: '/user/admin/batchSave', method: 'post', data })

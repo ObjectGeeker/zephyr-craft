@@ -1,11 +1,8 @@
 package com.object.ai.craft.domain.app.service;
 
-import com.object.ai.craft.api.model.app.AppAddRequest;
-import com.object.ai.craft.api.model.app.AppAdminPageRequest;
-import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
-import com.object.ai.craft.api.model.app.AppPageRequest;
-import com.object.ai.craft.api.model.app.AppUpdateRequest;
+import com.object.ai.craft.api.model.app.*;
 import com.object.ai.craft.domain.app.model.App;
+import com.object.ai.craft.types.common.DataContainer;
 import com.object.ai.craft.types.common.PageResult;
 
 /**
@@ -69,24 +66,6 @@ public interface AppService {
     PageResult<App> pageFeatured(AppPageRequest request);
 
     /**
-     * 由管理员更新应用的名称、封面或优先级。
-     *
-     * @param request 管理员更新请求
-     * @return {@code true} 表示更新成功
-     * @throws com.object.ai.craft.types.exception.BusinessException 没有待更新字段、名称为空或应用不存在时抛出
-     */
-    boolean updateByAdmin(AppAdminUpdateRequest request);
-
-    /**
-     * 由管理员删除指定应用。
-     *
-     * @param id 应用主键
-     * @return {@code true} 表示删除成功
-     * @throws com.object.ai.craft.types.exception.BusinessException 应用不存在时抛出
-     */
-    boolean removeByAdmin(String id);
-
-    /**
      * 获取应用详情，包含逻辑删除的记录，供管理员管理使用。
      *
      * @param id 应用主键
@@ -102,6 +81,17 @@ public interface AppService {
      * @return 应用分页结果
      */
     PageResult<App> pageByAdmin(AppAdminPageRequest request);
+
+    /**
+     * 管理员批量更新或删除应用。
+     *
+     * <p>管理员不能通过该接口创建用户应用；任一操作失败时全部回滚。</p>
+     *
+     * @param dataContainer 批量新增、修改和删除数据容器
+     * @return {@code true} 表示全部操作成功
+     * @throws com.object.ai.craft.types.exception.BusinessException 当前用户不是管理员、操作数据无效或应用不存在时抛出
+     */
+    boolean batchSaveAdmin(DataContainer<AppBatchSaveRequest> dataContainer);
 
     /**
      * 获取当前登录用户拥有应用的预览地址。

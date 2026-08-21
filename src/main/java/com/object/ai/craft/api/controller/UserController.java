@@ -3,30 +3,18 @@ package com.object.ai.craft.api.controller;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import com.object.ai.craft.api.model.user.LoginRequest;
 import com.object.ai.craft.api.model.user.RegisterRequest;
-import com.object.ai.craft.api.model.user.UserUpdateRequest;
+import com.object.ai.craft.api.model.user.UserBatchSaveRequest;
 import com.object.ai.craft.api.model.user.UserVO;
 import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.domain.user.service.UserService;
-import com.object.ai.craft.types.common.BaseResponse;
-import com.object.ai.craft.types.common.PageRequest;
-import com.object.ai.craft.types.common.PageResult;
-import com.object.ai.craft.types.common.ResultUtil;
+import com.object.ai.craft.types.common.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 用户认证与管理接口。
@@ -77,52 +65,11 @@ public class UserController {
     }
 
     /**
-     * 管理员创建普通用户。
+     * 根据 ID 获取用户详情，所有用户均可访问。
      */
-    @SaCheckRole("admin")
-    @Operation(summary = "管理员创建用户", description = "创建普通用户，但不建立登录会话")
-    @PostMapping("save")
-    public BaseResponse<UserVO> save(@Valid @RequestBody RegisterRequest request) {
-        return ResultUtil.success(UserVO.from(userService.createByAdmin(request)));
-    }
-
-    /**
-     * 管理员删除用户。
-     */
-    @SaCheckRole("admin")
-    @Operation(summary = "管理员删除用户")
-    @DeleteMapping("remove/{id}")
-    public BaseResponse<Boolean> remove(@Parameter(description = "用户 ID", required = true) @PathVariable String id) {
-        return ResultUtil.success(userService.removeById(id));
-    }
-
-    /**
-     * 管理员更新用户资料。
-     */
-    @SaCheckRole("admin")
-    @Operation(summary = "管理员更新用户资料", description = "仅更新昵称、头像和个人简介")
-    @PutMapping("update")
-    public BaseResponse<Boolean> update(@Valid @RequestBody UserUpdateRequest request) {
-        return ResultUtil.success(userService.updateProfile(request));
-    }
-
-    /**
-     * 管理员查询所有用户。
-     */
-    @SaCheckRole("admin")
-    @Operation(summary = "管理员查询全部用户")
-    @GetMapping("list")
-    public BaseResponse<List<UserVO>> list() {
-        return ResultUtil.success(userService.list().stream().map(UserVO::from).toList());
-    }
-
-    /**
-     * 管理员获取用户详情。
-     */
-    @SaCheckRole("admin")
-    @Operation(summary = "管理员获取用户详情")
+    @Operation(summary = "获取用户详情", description = "无需管理员权限，可根据用户 ID 查询用户公开资料")
     @GetMapping("getInfo/{id}")
-    public BaseResponse<UserVO> getInfo(@Parameter(description = "用户 ID", required = true) @PathVariable String id) {
+    public BaseResponse<UserVO> getUserById(@Parameter(description = "用户 ID", required = true) @PathVariable String id) {
         return ResultUtil.success(UserVO.from(userService.getById(id)));
     }
 
@@ -140,6 +87,13 @@ public class UserController {
                 result.getCurrent(),
                 result.getPageSize()
         ));
+    }
+
+    @SaCheckRole("admin")
+    @Operation(summary = "管理员批量管理用户", description = "管理员用户新增、更新与删除的唯一写入入口")
+    @PostMapping("admin/batchSave")
+    public BaseResponse<Boolean> batchSaveAdmin(@Valid @RequestBody DataContainer<UserBatchSaveRequest> dataContainer) {
+        return ResultUtil.success(userService.batchSaveAdmin(dataContainer));
     }
 
 }

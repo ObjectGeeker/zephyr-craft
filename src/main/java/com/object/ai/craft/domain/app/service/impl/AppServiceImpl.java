@@ -1,20 +1,20 @@
 package com.object.ai.craft.domain.app.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
-import com.object.ai.craft.api.model.app.AppAddRequest;
-import com.object.ai.craft.api.model.app.AppAdminPageRequest;
-import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
-import com.object.ai.craft.api.model.app.AppPageRequest;
-import com.object.ai.craft.api.model.app.AppUpdateRequest;
+import com.object.ai.craft.api.model.app.*;
 import com.object.ai.craft.domain.agent.model.CodeGenEnum;
 import com.object.ai.craft.domain.app.model.App;
 import com.object.ai.craft.domain.app.model.AppPriority;
 import com.object.ai.craft.domain.app.repository.AppRepository;
 import com.object.ai.craft.domain.app.service.AppService;
 import com.object.ai.craft.domain.user.model.User;
+import com.object.ai.craft.domain.user.model.UserRole;
 import com.object.ai.craft.domain.user.service.UserService;
+import com.object.ai.craft.types.common.DataContainer;
 import com.object.ai.craft.types.common.PageResult;
 import com.object.ai.craft.types.constant.AppConstant;
 import com.object.ai.craft.types.exception.ErrorCode;
@@ -22,9 +22,13 @@ import com.object.ai.craft.types.exception.ThrowUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 应用领域服务实现。
@@ -96,42 +100,32 @@ public class AppServiceImpl implements AppService {
     }
 
     @Override
-    public boolean updateByAdmin(AppAdminUpdateRequest request) {
-        ThrowUtil.throwIf(request.getAppName() == null && request.getCover() == null && request.getPriority() == null,
-                ErrorCode.PARAMS_ERROR, "至少填写一个待更新字段");
-        ThrowUtil.throwIf(request.getAppName() != null && !hasText(request.getAppName()),
-                ErrorCode.PARAMS_ERROR, "应用名称不能为空");
-        App app = getByIdForAdmin(request.getId());
-        // 管理员只能修改公开运营字段，保留创建提示词及创建者等归属信息。
-        if (request.getAppName() != null) {
-            app.setAppName(request.getAppName());
-        }
-        if (request.getCover() != null) {
-            app.setCover(request.getCover());
-        }
-        if (request.getPriority() != null) {
-            app.setPriority(request.getPriority());
-        }
-        app.setEditTime(LocalDateTime.now());
-        return appRepository.updateById(app);
-    }
-
-    @Override
-    public boolean removeByAdmin(String id) {
-        ThrowUtil.throwIfNull(appRepository.getById(id), ErrorCode.NOT_FOUND_ERROR);
-        return appRepository.removeById(id);
-    }
-
-    @Override
     public App getByIdForAdmin(String id) {
-        App app = appRepository.getByIdIncludeDeleted(id);
-        ThrowUtil.throwIfNull(app, ErrorCode.NOT_FOUND_ERROR);
-        return app;
+        checkAdmin();
+        return getAppByIdForAdmin(id);
     }
 
     @Override
     public PageResult<App> pageByAdmin(AppAdminPageRequest request) {
+        checkAdmin();
         return appRepository.pageAdmin(request);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean batchSaveAdmin(DataContainer<AppBatchSaveRequest> dataContainer) {
+        checkAdmin();
+        validateNoConflictingIds(dataContainer);
+        if (CollUtil.isNotEmpty(dataContainer.getCreateData())) {
+            doBatchCreate(dataContainer.getCreateData());
+        }
+        if (CollUtil.isNotEmpty(dataContainer.getModifyData())) {
+            doBatchUpdate(dataContainer.getModifyData());
+        }
+        if (CollUtil.isNotEmpty(dataContainer.getRemoveData())) {
+            doBatchRemove(dataContainer.getRemoveData());
+        }
+        return true;
     }
 
     @Override
@@ -180,6 +174,69 @@ public class AppServiceImpl implements AppService {
         ThrowUtil.throwIf(!app.getUserId().equals(loginUser.getId()),
                 ErrorCode.FORBIDDEN_ERROR, "无权操作该应用");
         return app;
+    }
+
+    private void doBatchCreate(List<AppBatchSaveRequest> createData) {
+        ThrowUtil.throwIf(CollUtil.isNotEmpty(createData), ErrorCode.PARAMS_ERROR, "管理员不支持创建用户应用");
+    }
+
+    private void doBatchUpdate(List<AppBatchSaveRequest> modifyData) {
+        List<String> ids = validateIds(modifyData);
+        List<App> apps = modifyData.stream().map(request -> {
+            ThrowUtil.throwIf(request.getAppName() == null && request.getCover() == null && request.getPriority() == null,
+                    ErrorCode.PARAMS_ERROR, "至少填写一个待更新字段");
+            ThrowUtil.throwIf(request.getAppName() != null && !hasText(request.getAppName()),
+                    ErrorCode.PARAMS_ERROR, "应用名称不能为空");
+            App app = getAppByIdForAdmin(request.getId());
+            // 管理员只能修改公开运营字段，保留创建提示词、创建者和部署数据。
+            if (request.getAppName() != null) {
+                app.setAppName(request.getAppName());
+            }
+            if (request.getCover() != null) {
+                app.setCover(request.getCover());
+            }
+            if (request.getPriority() != null) {
+                app.setPriority(request.getPriority());
+            }
+            app.setEditTime(LocalDateTime.now());
+            return app;
+        }).toList();
+        ThrowUtil.throwIf(ids.isEmpty() || !appRepository.updateBatchById(apps), ErrorCode.OPERATION_ERROR, "批量更新应用失败");
+    }
+
+    private void doBatchRemove(List<AppBatchSaveRequest> removeData) {
+        List<String> ids = validateIds(removeData);
+        ids.forEach(id -> ThrowUtil.throwIfNull(appRepository.getById(id), ErrorCode.NOT_FOUND_ERROR));
+        ThrowUtil.throwIf(!appRepository.removeByIds(ids), ErrorCode.OPERATION_ERROR, "批量删除应用失败");
+    }
+
+    private List<String> validateIds(List<AppBatchSaveRequest> requests) {
+        List<String> ids = requests.stream().map(AppBatchSaveRequest::getId).toList();
+        ThrowUtil.throwIf(ids.stream().anyMatch(id -> !hasText(id)), ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        ThrowUtil.throwIf(new HashSet<>(ids).size() != ids.size(), ErrorCode.PARAMS_ERROR, "应用 ID 不能重复");
+        return ids;
+    }
+
+    private void validateNoConflictingIds(DataContainer<AppBatchSaveRequest> dataContainer) {
+        Set<String> modifyIds = dataContainer.getModifyData().stream()
+                .map(AppBatchSaveRequest::getId)
+                .filter(this::hasText)
+                .collect(java.util.stream.Collectors.toSet());
+        boolean conflicts = dataContainer.getRemoveData().stream()
+                .map(AppBatchSaveRequest::getId)
+                .filter(this::hasText)
+                .anyMatch(modifyIds::contains);
+        ThrowUtil.throwIf(conflicts, ErrorCode.PARAMS_ERROR, "同一应用不能同时修改和删除");
+    }
+
+    private App getAppByIdForAdmin(String id) {
+        App app = appRepository.getByIdIncludeDeleted(id);
+        ThrowUtil.throwIfNull(app, ErrorCode.NOT_FOUND_ERROR);
+        return app;
+    }
+
+    private void checkAdmin() {
+        StpUtil.checkRole(UserRole.ADMIN.getValue());
     }
 
     private boolean hasText(String value) {

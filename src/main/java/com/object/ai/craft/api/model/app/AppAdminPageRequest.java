@@ -23,6 +23,5 @@ public class AppAdminPageRequest {
     private String deployKey;
     private Integer priority;
     private String userId;
-    private Integer isDelete;
 
 }

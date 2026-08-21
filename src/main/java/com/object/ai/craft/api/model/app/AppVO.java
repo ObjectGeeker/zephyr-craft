@@ -1,8 +1,8 @@
 package com.object.ai.craft.api.model.app;
 
+import com.object.ai.craft.api.model.user.UserVO;
 import com.object.ai.craft.domain.app.model.App;
 import com.object.ai.craft.domain.user.model.User;
-import com.object.ai.craft.api.model.user.UserVO;
 import lombok.Builder;
 import lombok.Data;
 

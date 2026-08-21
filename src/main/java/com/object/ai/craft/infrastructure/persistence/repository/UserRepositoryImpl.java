@@ -3,6 +3,7 @@ package com.object.ai.craft.infrastructure.persistence.repository;
 import cn.hutool.core.bean.BeanUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.row.Db;
 import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.domain.user.repository.UserRepository;
 import com.object.ai.craft.infrastructure.persistence.mapper.UserMapper;
@@ -33,6 +34,15 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public boolean saveBatch(Collection<User> users) {
+        if (users == null || users.isEmpty()) {
+            return true;
+        }
+        List<UserPO> userPOs = users.stream().map(this::toPO).toList();
+        return userMapper.insertBatchSelective(userPOs) == users.size();
+    }
+
+    @Override
     public User getByAccount(String account) {
         UserPO userPO = userMapper.selectOneByQuery(
                 QueryWrapper.create().eq(UserPO::getAccount, account)
@@ -46,15 +56,25 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public boolean removeByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return true;
+        }
+        return userMapper.deleteBatchByIds(ids) == ids.size();
+    }
+
+    @Override
     public boolean updateById(User user) {
         return userMapper.update(toPO(user)) > 0;
     }
 
     @Override
-    public List<User> list() {
-        return userMapper.selectAll().stream()
-                .map(this::toDomain)
-                .toList();
+    public boolean updateBatchById(Collection<User> users) {
+        if (users == null || users.isEmpty()) {
+            return true;
+        }
+        List<UserPO> userPOs = users.stream().map(this::toPO).toList();
+        return Db.updateEntitiesBatch(userPOs) == users.size();
     }
 
     @Override

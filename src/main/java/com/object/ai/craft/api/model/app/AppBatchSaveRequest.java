@@ -1,16 +1,14 @@
 package com.object.ai.craft.api.model.app;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 管理员更新应用请求体。
+ * 管理员批量管理应用的数据项。
  */
 @Data
-public class AppAdminUpdateRequest {
+public class AppBatchSaveRequest {
 
-    @NotBlank(message = "应用ID不能为空")
     private String id;
 
     @Size(min = 1, max = 256, message = "应用名称长度必须在1到256个字符之间")

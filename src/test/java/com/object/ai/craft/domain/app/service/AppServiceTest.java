@@ -1,15 +1,18 @@
 package com.object.ai.craft.domain.app.service;
 
 import cn.hutool.core.io.FileUtil;
+import cn.dev33.satoken.stp.StpUtil;
 import com.object.ai.craft.api.model.app.AppAddRequest;
-import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
+import com.object.ai.craft.api.model.app.AppBatchSaveRequest;
 import com.object.ai.craft.api.model.app.AppUpdateRequest;
 import com.object.ai.craft.domain.app.model.App;
 import com.object.ai.craft.domain.app.model.AppPriority;
 import com.object.ai.craft.domain.app.repository.AppRepository;
 import com.object.ai.craft.domain.app.service.impl.AppServiceImpl;
 import com.object.ai.craft.domain.user.model.User;
+import com.object.ai.craft.domain.user.model.UserRole;
 import com.object.ai.craft.domain.user.service.UserService;
+import com.object.ai.craft.types.common.DataContainer;
 import com.object.ai.craft.types.constant.AppConstant;
 import com.object.ai.craft.types.exception.BusinessException;
 import com.object.ai.craft.types.exception.ErrorCode;
@@ -19,21 +22,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.File;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * 应用领域服务测试。
@@ -100,23 +98,28 @@ class AppServiceTest {
     }
 
     @Test
-    void updateByAdminShouldOnlyApplyAllowedFields() {
-        AppAdminUpdateRequest request = new AppAdminUpdateRequest();
+    void batchSaveAdminShouldOnlyApplyAllowedFields() {
+        AppBatchSaveRequest request = new AppBatchSaveRequest();
         request.setId("app-3");
         request.setAppName("管理员名称");
         request.setCover("https://example.com/cover.png");
         request.setPriority(10);
         App app = App.builder().id("app-3").appName("旧名称").initPrompt("不可修改").build();
         when(appRepository.getByIdIncludeDeleted("app-3")).thenReturn(app);
-        when(appRepository.updateById(any(App.class))).thenReturn(true);
+        when(appRepository.updateBatchById(any())).thenReturn(true);
+        DataContainer<AppBatchSaveRequest> dataContainer = new DataContainer<>();
+        dataContainer.setModifyData(java.util.List.of(request));
 
-        assertTrue(appService.updateByAdmin(request));
+        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+            assertTrue(appService.batchSaveAdmin(dataContainer));
+            stpUtil.verify(() -> StpUtil.checkRole(UserRole.ADMIN.getValue()));
+        }
 
         assertEquals("管理员名称", app.getAppName());
         assertEquals("https://example.com/cover.png", app.getCover());
         assertEquals(10, app.getPriority());
         assertEquals("不可修改", app.getInitPrompt());
-        verify(appRepository).updateById(eq(app));
+        verify(appRepository).updateBatchById(java.util.List.of(app));
     }
 
     @Test

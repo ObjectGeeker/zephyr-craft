@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { APP_PRIORITY, type AppAdminUpdateRequest, type AppVO } from '../../api/app'
+import { APP_PRIORITY, type AppBatchSaveRequest, type AppVO } from '../../api/app'
 import Modal from './Modal'
 
 interface AppEditModalProps {
@@ -8,7 +8,7 @@ interface AppEditModalProps {
   /** 服务端错误，由父组件传入展示 */
   serverError: string
   submitting: boolean
-  onSubmit: (values: AppAdminUpdateRequest) => void
+  onSubmit: (values: AppBatchSaveRequest) => void
   onClose: () => void
 }
 

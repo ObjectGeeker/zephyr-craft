@@ -23,6 +23,14 @@ public interface UserRepository {
     boolean save(User user);
 
     /**
+     * 批量保存用户。
+     *
+     * @param users 用户集合
+     * @return {@code true} 表示所有用户均保存成功
+     */
+    boolean saveBatch(Collection<User> users);
+
+    /**
      * 根据账号获取用户。
      *
      * @param account 账号
@@ -39,6 +47,14 @@ public interface UserRepository {
     boolean removeById(String id);
 
     /**
+     * 根据主键批量删除用户。
+     *
+     * @param ids 用户主键集合
+     * @return {@code true} 表示所有指定用户均已删除
+     */
+    boolean removeByIds(Collection<String> ids);
+
+    /**
      * 根据主键更新用户
      *
      * @param user 用户
@@ -47,11 +63,12 @@ public interface UserRepository {
     boolean updateById(User user);
 
     /**
-     * 查询所有用户
+     * 根据主键批量更新用户资料。
      *
-     * @return 用户列表
+     * @param users 待更新用户集合
+     * @return {@code true} 表示所有用户均更新成功
      */
-    List<User> list();
+    boolean updateBatchById(Collection<User> users);
 
     /**
      * 根据主键批量查询用户。

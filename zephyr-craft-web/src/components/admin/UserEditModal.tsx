@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { UserUpdateRequest, UserVO } from '../../api/user'
+import type { UserBatchSaveRequest, UserVO } from '../../api/user'
 import Modal from './Modal'
 
 interface UserEditModalProps {
@@ -8,7 +8,7 @@ interface UserEditModalProps {
   /** 服务端错误，由父组件传入展示 */
   serverError: string
   submitting: boolean
-  onSubmit: (values: UserUpdateRequest) => void
+  onSubmit: (values: UserBatchSaveRequest) => void
   onClose: () => void
 }
 

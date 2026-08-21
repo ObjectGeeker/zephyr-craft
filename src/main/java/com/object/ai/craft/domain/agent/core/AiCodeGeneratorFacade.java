@@ -85,7 +85,7 @@ public class AiCodeGeneratorFacade {
      *
      * @param userMessage 用户消息
      * @param codeGenEnum 生成类型
-     * @param emitter SSE 响应发送器
+     * @param emitter     SSE 响应发送器
      */
     public void generateCodeStream(String userMessage, CodeGenEnum codeGenEnum, SseEmitter emitter, String appId) {
         if (emitter == null) {

@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { BusinessError } from '../api/request'
 import {
   APP_PRIORITY,
   adminPageApps,
-  adminRemoveApp,
-  adminUpdateApp,
-  type AppAdminUpdateRequest,
-  type AppVO
+  batchSaveAdminApps,
+  type AppBatchSaveRequest,
+  type AppVO,
+  type DataContainer
 } from '../api/app'
 import { useUser } from '../store/useUser'
 import AdminLayout from '../components/admin/AdminLayout'
@@ -24,14 +24,18 @@ interface Toast {
   message: string
 }
 
-/** 格式化后端 LocalDateTime 字符串（2026-08-19T17:38:59 → 2026-08-19 17:38） */
+const emptyChanges = (): DataContainer<AppBatchSaveRequest> => ({
+  createData: [],
+  modifyData: [],
+  removeData: []
+})
+
 const formatDateTime = (value: string | null | undefined) =>
   value ? value.replace('T', ' ').slice(0, 16) : '-'
 
 export default function AdminAppsPage() {
   const reduceMotion = useReducedMotion()
   const { currentUser, loading: userLoading } = useUser()
-
   const [records, setRecords] = useState<AppVO[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -42,16 +46,12 @@ export default function AdminAppsPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [tableLoading, setTableLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [changes, setChanges] = useState<DataContainer<AppBatchSaveRequest>>(emptyChanges)
+  const [saving, setSaving] = useState(false)
 
   const [editTarget, setEditTarget] = useState<AppVO | null>(null)
-  const [editError, setEditError] = useState('')
-  const [editing, setEditing] = useState(false)
-
   const [removeTarget, setRemoveTarget] = useState<AppVO | null>(null)
-  const [removing, setRemoving] = useState(false)
-
-  const [togglingId, setTogglingId] = useState<string | null>(null)
-
+  const [discardOpen, setDiscardOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const toastTimer = useRef<number | null>(null)
 
@@ -69,7 +69,6 @@ export default function AdminAppsPage() {
 
   useEffect(() => {
     let active = true
-    // 首次加载、分页切换、筛选与手动刷新：在异步回调中更新状态
     const priority =
       appliedStatus === 'featured'
         ? APP_PRIORITY.FEATURED
@@ -96,18 +95,37 @@ export default function AdminAppsPage() {
     }
   }, [page, appliedName, appliedStatus, refreshKey])
 
-  /** 手动刷新当前页（事件处理器中调用） */
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const pendingCount = changes.modifyData.length + changes.removeData.length
+  const hasPendingChanges = pendingCount > 0
+
+  const displayedApps = useMemo(() => {
+    const removedIds = new Set(changes.removeData.map((item) => item.id))
+    const modifiedApps = new Map(changes.modifyData.map((item) => [item.id, item]))
+    return records
+      .filter((app) => !removedIds.has(app.id))
+      .map((app) => {
+        const change = modifiedApps.get(app.id)
+        return change
+          ? {
+              ...app,
+              appName: change.appName ?? app.appName,
+              cover: change.cover ?? app.cover,
+              priority: change.priority ?? app.priority
+            }
+          : app
+      })
+  }, [changes.modifyData, changes.removeData, records])
+
   const refresh = useCallback(() => {
+    if (saving) return
     setTableLoading(true)
     setLoadError('')
     setRefreshKey((key) => key + 1)
-  }, [])
+  }, [saving])
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-
-  /** 分页切换：先置加载态再更新页码，避免界面闪烁旧数据 */
   const changePage = (next: number) => {
-    if (next < 1 || next > totalPages || next === page) return
+    if (saving || next < 1 || next > totalPages || next === page) return
     setTableLoading(true)
     setLoadError('')
     setPage(next)
@@ -115,6 +133,7 @@ export default function AdminAppsPage() {
 
   const handleFilter = (event: FormEvent) => {
     event.preventDefault()
+    if (saving) return
     setTableLoading(true)
     setLoadError('')
     setPage(1)
@@ -123,67 +142,72 @@ export default function AdminAppsPage() {
     setRefreshKey((key) => key + 1)
   }
 
-  const handleEdit = async (values: AppAdminUpdateRequest) => {
-    setEditing(true)
-    setEditError('')
-    try {
-      await adminUpdateApp(values)
-      setEditTarget(null)
-      showToast({ type: 'success', message: '应用信息已更新' })
-      refresh()
-    } catch (error) {
-      setEditError(error instanceof BusinessError ? error.message : '保存失败，请稍后重试')
-    } finally {
-      setEditing(false)
-    }
+  const stageModification = (values: AppBatchSaveRequest) => {
+    if (!values.id) return
+    setChanges((previous) => ({
+      ...previous,
+      modifyData: [...previous.modifyData.filter((item) => item.id !== values.id), values]
+    }))
   }
 
-  const handleToggleFeatured = async (app: AppVO) => {
-    if (togglingId) return
-    const featured = app.priority === APP_PRIORITY.FEATURED
-    setTogglingId(app.id)
-    try {
-      await adminUpdateApp({ id: app.id, priority: featured ? APP_PRIORITY.NORMAL : APP_PRIORITY.FEATURED })
-      showToast({
-        type: 'success',
-        message: featured ? `已取消「${app.appName}」的精选` : `已将「${app.appName}」设为精选`
-      })
-      refresh()
-    } catch (error) {
-      showToast({
-        type: 'error',
-        message: error instanceof BusinessError ? error.message : '操作失败，请稍后重试'
-      })
-    } finally {
-      setTogglingId(null)
-    }
+  const handleEdit = (values: AppBatchSaveRequest) => {
+    stageModification(values)
+    setEditTarget(null)
+    showToast({ type: 'success', message: '应用修改已加入待保存更改' })
   }
 
-  const handleRemove = async () => {
+  const handleToggleFeatured = (app: AppVO) => {
+    stageModification({
+      id: app.id,
+      priority: app.priority === APP_PRIORITY.FEATURED ? APP_PRIORITY.NORMAL : APP_PRIORITY.FEATURED
+    })
+    showToast({
+      type: 'success',
+      message: app.priority === APP_PRIORITY.FEATURED ? '取消精选已加入待保存更改' : '设为精选已加入待保存更改'
+    })
+  }
+
+  const handleRemove = () => {
     if (!removeTarget) return
-    setRemoving(true)
+    setChanges((previous) => ({
+      ...previous,
+      modifyData: previous.modifyData.filter((item) => item.id !== removeTarget.id),
+      removeData: [...previous.removeData.filter((item) => item.id !== removeTarget.id), { id: removeTarget.id }]
+    }))
+    setRemoveTarget(null)
+    showToast({ type: 'success', message: '删除操作已加入待保存更改' })
+  }
+
+  const discardChanges = () => {
+    setChanges(emptyChanges())
+    setDiscardOpen(false)
+    refresh()
+    showToast({ type: 'success', message: '已放弃全部待保存更改' })
+  }
+
+  const saveChanges = async () => {
+    if (!hasPendingChanges || saving) return
+    setSaving(true)
     try {
-      await adminRemoveApp(removeTarget.id)
-      showToast({ type: 'success', message: `应用「${removeTarget.appName}」已删除` })
-      setRemoveTarget(null)
-      // 删除当前页最后一条时回退一页
-      if (records.length === 1 && page > 1) {
-        changePage(page - 1)
+      await batchSaveAdminApps(changes)
+      const remainingTotal = Math.max(0, total - changes.removeData.length)
+      const targetPage = Math.min(page, Math.max(1, Math.ceil(remainingTotal / PAGE_SIZE)))
+      setChanges(emptyChanges())
+      showToast({ type: 'success', message: '全部更改已保存' })
+      if (targetPage === page) {
+        setTableLoading(true)
+        setRefreshKey((key) => key + 1)
       } else {
-        refresh()
+        setTableLoading(true)
+        setPage(targetPage)
       }
     } catch (error) {
-      setRemoveTarget(null)
-      showToast({
-        type: 'error',
-        message: error instanceof BusinessError ? error.message : '删除失败，请稍后重试'
-      })
+      showToast({ type: 'error', message: error instanceof BusinessError ? error.message : '保存失败，请稍后重试' })
     } finally {
-      setRemoving(false)
+      setSaving(false)
     }
   }
 
-  // ---------- 权限守卫 ----------
   if (userLoading) {
     return (
       <div className="page-glow flex h-dvh items-center justify-center">
@@ -191,301 +215,88 @@ export default function AdminAppsPage() {
           <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
           <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
-        <span className="sr-only">正在校验登录状态</span>
       </div>
     )
   }
 
-  if (!currentUser) {
-    return <Navigate to="/login" replace />
-  }
+  if (!currentUser) return <Navigate to="/login" replace />
 
   if (currentUser.role !== 'admin') {
     return (
       <div className="page-glow flex h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="text-2xl font-bold text-ink">无权访问</h1>
         <p className="text-sm text-ink-muted">当前账号不是管理员，无法进入后台管理。</p>
-        <Link
-          to="/"
-          className="rounded-full bg-brand px-6 py-2.5 text-sm font-medium text-white shadow-sm shadow-brand/30 transition-colors duration-200 hover:bg-brand-dark"
-        >
-          返回主页
-        </Link>
+        <Link to="/" className="rounded-full bg-brand px-6 py-2.5 text-sm font-medium text-white shadow-sm shadow-brand/30 hover:bg-brand-dark">返回主页</Link>
       </div>
     )
   }
 
   return (
     <AdminLayout>
-      {/* 主内容区 */}
       <motion.main
         initial={reduceMotion ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="flex min-w-0 flex-1 flex-col overflow-hidden"
       >
-        {/* 页头与筛选 */}
-        <header className="flex shrink-0 flex-col gap-3 border-b border-line/70 bg-white/80 px-6 py-4 backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div>
-            <h1 className="text-lg font-semibold text-ink">应用管理</h1>
-            <p className="mt-0.5 text-xs text-ink-muted">管理所有用户生成的应用，支持编辑、删除与加精</p>
+        <header className="flex shrink-0 flex-col gap-3 border-b border-line/70 bg-white/80 px-6 py-4 backdrop-blur-sm lg:px-8">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-lg font-semibold text-ink">应用管理</h1>
+              <p className="mt-0.5 text-xs text-ink-muted">管理所有用户生成的应用，编辑、精选和删除会暂存后一次保存</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {hasPendingChanges && <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">待保存：修改 {changes.modifyData.length} · 删除 {changes.removeData.length}</span>}
+              {hasPendingChanges && <button type="button" onClick={() => setDiscardOpen(true)} disabled={saving} className="h-10 cursor-pointer rounded-full border border-line bg-white px-4 text-sm font-medium text-ink hover:bg-mist disabled:cursor-not-allowed disabled:opacity-60">放弃全部更改</button>}
+              <button type="button" onClick={saveChanges} disabled={!hasPendingChanges || saving} className="h-10 cursor-pointer rounded-full bg-brand px-4 text-sm font-medium text-white shadow-sm shadow-brand/30 hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">{saving ? '保存中…' : '保存全部更改'}</button>
+            </div>
           </div>
           <form className="flex w-full max-w-xl gap-2" onSubmit={handleFilter} role="search">
-            <label htmlFor="admin-app-search" className="sr-only">
-              按应用名称搜索
-            </label>
-            <input
-              id="admin-app-search"
-              type="text"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="搜索应用名称"
-              className="h-10 min-w-0 flex-1 rounded-full border border-line bg-white px-4 text-sm text-ink outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-brand"
-            />
-            <label htmlFor="admin-app-status" className="sr-only">
-              按精选状态筛选
-            </label>
-            <select
-              id="admin-app-status"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-              className="h-10 shrink-0 cursor-pointer rounded-full border border-line bg-white px-3.5 text-sm text-ink outline-none transition-colors duration-200 focus:border-brand"
-            >
-              <option value="all">全部状态</option>
-              <option value="featured">仅精选</option>
-              <option value="normal">仅普通</option>
+            <label htmlFor="admin-app-search" className="sr-only">按应用名称搜索</label>
+            <input id="admin-app-search" type="text" value={searchText} disabled={saving} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索应用名称" className="h-10 min-w-0 flex-1 rounded-full border border-line bg-white px-4 text-sm text-ink outline-none placeholder:text-slate-400 focus:border-brand disabled:opacity-60" />
+            <label htmlFor="admin-app-status" className="sr-only">按精选状态筛选</label>
+            <select id="admin-app-status" value={statusFilter} disabled={saving} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)} className="h-10 shrink-0 cursor-pointer rounded-full border border-line bg-white px-3.5 text-sm text-ink outline-none focus:border-brand disabled:cursor-not-allowed disabled:opacity-60">
+              <option value="all">全部状态</option><option value="featured">仅精选</option><option value="normal">仅普通</option>
             </select>
-            <button
-              type="submit"
-              className="h-10 shrink-0 cursor-pointer rounded-full bg-brand px-5 text-sm font-medium text-white shadow-sm shadow-brand/30 transition-colors duration-200 hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-            >
-              筛选
-            </button>
+            <button type="submit" disabled={saving} className="h-10 shrink-0 cursor-pointer rounded-full bg-brand px-5 text-sm font-medium text-white shadow-sm shadow-brand/30 hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">筛选</button>
           </form>
         </header>
 
-        {/* 表格区 */}
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 lg:px-8">
           <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm shadow-brand/5">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-line bg-mist/60 text-xs text-ink-muted">
-                    <th scope="col" className="px-5 py-3.5 font-medium">应用</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium">创建者</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium">生成方式</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium">状态</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium">创建时间</th>
-                    <th scope="col" className="px-5 py-3.5 text-right font-medium">操作</th>
-                  </tr>
-                </thead>
+                <thead><tr className="border-b border-line bg-mist/60 text-xs text-ink-muted"><th className="px-5 py-3.5 font-medium">应用</th><th className="px-5 py-3.5 font-medium">创建者</th><th className="px-5 py-3.5 font-medium">生成方式</th><th className="px-5 py-3.5 font-medium">状态</th><th className="px-5 py-3.5 font-medium">创建时间</th><th className="px-5 py-3.5 text-right font-medium">操作</th></tr></thead>
                 <tbody>
-                  {tableLoading &&
-                    Array.from({ length: 5 }).map((_, index) => (
-                      <tr key={index} className="border-b border-line/60 last:border-b-0">
-                        {Array.from({ length: 6 }).map((__, cell) => (
-                          <td key={cell} className="px-5 py-4">
-                            <div className="h-4 w-full max-w-28 animate-pulse rounded bg-mist" aria-hidden="true" />
-                          </td>
-                        ))}
+                  {tableLoading && <tr><td colSpan={6} className="px-5 py-14 text-center text-sm text-ink-muted">正在加载应用…</td></tr>}
+                  {!tableLoading && loadError && <tr><td colSpan={6} className="px-5 py-14 text-center"><p className="text-sm text-ink-muted">{loadError}</p><button type="button" onClick={refresh} className="mt-3 cursor-pointer rounded-full border border-line px-5 py-2 text-sm text-brand hover:border-brand/40 hover:bg-mist">重新加载</button></td></tr>}
+                  {!tableLoading && !loadError && displayedApps.length === 0 && <tr><td colSpan={6} className="px-5 py-14 text-center text-sm text-ink-muted">暂无应用数据</td></tr>}
+                  {!tableLoading && !loadError && displayedApps.map((app) => {
+                    const featured = app.priority === APP_PRIORITY.FEATURED
+                    const isModified = changes.modifyData.some((item) => item.id === app.id)
+                    return (
+                      <tr key={app.id} className="border-b border-line/60 transition-colors last:border-b-0 hover:bg-mist/40">
+                        <td className="px-5 py-3.5"><div className="flex items-center gap-3">{app.cover ? <img src={app.cover} alt="" className="h-10 w-16 shrink-0 rounded-lg border border-line object-cover" /> : <span aria-hidden="true" className="flex h-10 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand/75 to-brand-deep text-white/85">▣</span>}<div className="min-w-0"><p className="truncate font-medium text-ink" title={app.appName}>{app.appName}</p><p className="truncate text-xs text-ink-muted/70">{app.id}</p></div></div></td>
+                        <td className="px-5 py-3.5">{app.user ? <div className="min-w-0"><p className="truncate text-ink">{app.user.username || app.user.account}</p><p className="truncate text-xs text-ink-muted">{app.user.account}</p></div> : <span className="text-ink-muted">-</span>}</td>
+                        <td className="px-5 py-3.5 text-ink-muted">{app.codeGenType || '-'}</td>
+                        <td className="px-5 py-3.5">{isModified ? <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">待修改</span> : featured ? <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">精选</span> : <span className="inline-flex items-center rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink-muted">普通</span>}</td>
+                        <td className="px-5 py-3.5 text-ink-muted tabular-nums">{formatDateTime(app.createTime)}</td>
+                        <td className="px-5 py-3.5"><div className="flex justify-end gap-1"><button type="button" onClick={() => setEditTarget(app)} disabled={saving} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm text-brand hover:bg-mist disabled:cursor-not-allowed disabled:opacity-60">编辑</button><button type="button" onClick={() => handleToggleFeatured(app)} disabled={saving} className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-60 ${featured ? 'text-ink-muted hover:bg-mist hover:text-ink' : 'text-amber-600 hover:bg-amber-50'}`}>{featured ? '取消加精' : '加精'}</button><button type="button" onClick={() => setRemoveTarget(app)} disabled={saving} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">删除</button></div></td>
                       </tr>
-                    ))}
-
-                  {!tableLoading && loadError && (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-14 text-center">
-                        <p className="text-sm text-ink-muted">{loadError}</p>
-                        <button
-                          type="button"
-                          onClick={refresh}
-                          className="mt-3 cursor-pointer rounded-full border border-line px-5 py-2 text-sm text-brand transition-colors duration-200 hover:border-brand/40 hover:bg-mist focus-visible:outline-2 focus-visible:outline-brand"
-                        >
-                          重新加载
-                        </button>
-                      </td>
-                    </tr>
-                  )}
-
-                  {!tableLoading && !loadError && records.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-14 text-center">
-                        <p className="text-sm text-ink-muted">暂无应用数据</p>
-                      </td>
-                    </tr>
-                  )}
-
-                  {!tableLoading &&
-                    !loadError &&
-                    records.map((app) => {
-                      const featured = app.priority === APP_PRIORITY.FEATURED
-                      return (
-                        <tr key={app.id} className="border-b border-line/60 transition-colors duration-150 last:border-b-0 hover:bg-mist/40">
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              {app.cover ? (
-                                <img src={app.cover} alt="" className="h-10 w-16 shrink-0 rounded-lg border border-line object-cover" />
-                              ) : (
-                                <span
-                                  aria-hidden="true"
-                                  className="flex h-10 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand/75 to-brand-deep"
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white/85">
-                                    <rect x="3" y="4.5" width="18" height="15" rx="2" stroke="currentColor" strokeWidth="1.6" />
-                                    <path d="M3 8.5h18" stroke="currentColor" strokeWidth="1.6" />
-                                  </svg>
-                                </span>
-                              )}
-                              <div className="min-w-0">
-                                <p className="truncate font-medium text-ink" title={app.appName}>
-                                  {app.appName}
-                                </p>
-                                <p className="truncate text-xs text-ink-muted/70">{app.id}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            {app.user ? (
-                              <div className="min-w-0">
-                                <p className="truncate text-ink">{app.user.username || app.user.account}</p>
-                                <p className="truncate text-xs text-ink-muted">{app.user.account}</p>
-                              </div>
-                            ) : (
-                              <span className="text-ink-muted">-</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5 text-ink-muted">{app.codeGenType || '-'}</td>
-                          <td className="px-5 py-3.5">
-                            {featured ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                  <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8L12 2z" />
-                                </svg>
-                                精选
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center rounded-full bg-mist px-2.5 py-1 text-xs font-medium text-ink-muted">
-                                普通
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5 text-ink-muted tabular-nums">{formatDateTime(app.createTime)}</td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditError('')
-                                  setEditTarget(app)
-                                }}
-                                className="cursor-pointer rounded-lg px-3 py-1.5 text-sm text-brand transition-colors duration-150 hover:bg-mist focus-visible:outline-2 focus-visible:outline-brand"
-                              >
-                                编辑
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleFeatured(app)}
-                                disabled={togglingId !== null}
-                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-60 ${
-                                  featured
-                                    ? 'text-ink-muted hover:bg-mist hover:text-ink focus-visible:outline-brand'
-                                    : 'text-amber-600 hover:bg-amber-50 focus-visible:outline-amber-600'
-                                }`}
-                              >
-                                {togglingId === app.id ? '处理中…' : featured ? '取消加精' : '加精'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setRemoveTarget(app)}
-                                className="cursor-pointer rounded-lg px-3 py-1.5 text-sm text-red-600 transition-colors duration-150 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600"
-                              >
-                                删除
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
-
-            {/* 分页 */}
-            {!tableLoading && !loadError && records.length > 0 && (
-              <div className="flex items-center justify-between border-t border-line px-5 py-3.5">
-                <p className="text-xs text-ink-muted tabular-nums">
-                  共 {total} 个应用 · 第 {page}/{totalPages} 页
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => changePage(page - 1)}
-                    disabled={page <= 1}
-                    className="cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-sm text-ink transition-colors duration-150 hover:bg-mist focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    上一页
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => changePage(page + 1)}
-                    disabled={page >= totalPages}
-                    className="cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-sm text-ink transition-colors duration-150 hover:bg-mist focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    下一页
-                  </button>
-                </div>
-              </div>
-            )}
+            {!tableLoading && !loadError && displayedApps.length > 0 && <div className="flex items-center justify-between border-t border-line px-5 py-3.5"><p className="text-xs text-ink-muted tabular-nums">共 {total} 个应用 · 第 {page}/{totalPages} 页</p><div className="flex items-center gap-2"><button type="button" onClick={() => changePage(page - 1)} disabled={page <= 1 || saving} className="cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-sm text-ink hover:bg-mist disabled:cursor-not-allowed disabled:opacity-40">上一页</button><button type="button" onClick={() => changePage(page + 1)} disabled={page >= totalPages || saving} className="cursor-pointer rounded-lg border border-line px-3.5 py-1.5 text-sm text-ink hover:bg-mist disabled:cursor-not-allowed disabled:opacity-40">下一页</button></div></div>}
           </div>
         </div>
       </motion.main>
 
-      {/* 弹窗 */}
-      {editTarget && (
-        <AppEditModal
-          app={editTarget}
-          serverError={editError}
-          submitting={editing}
-          onSubmit={handleEdit}
-          onClose={() => setEditTarget(null)}
-        />
-      )}
-      {removeTarget && (
-        <ConfirmDialog
-          title="删除应用"
-          message={`确定要删除应用「${removeTarget.appName}」吗？删除后该应用及其部署内容将无法访问。`}
-          confirmText="确认删除"
-          loading={removing}
-          onConfirm={handleRemove}
-          onCancel={() => setRemoveTarget(null)}
-        />
-      )}
-
-      {/* Toast 反馈 */}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-5 z-[60] flex justify-center">
-        {toast && (
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-white shadow-lg ${
-              toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
-            }`}
-          >
-            {toast.type === 'success' ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ) : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M12 7.5V13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                <circle cx="12" cy="16.5" r="1" fill="currentColor" />
-              </svg>
-            )}
-            {toast.message}
-          </motion.div>
-        )}
-      </div>
+      {editTarget && <AppEditModal app={editTarget} serverError="" submitting={saving} onSubmit={handleEdit} onClose={() => setEditTarget(null)} />}
+      {removeTarget && <ConfirmDialog title="删除应用" message={`确定将应用「${removeTarget.appName}」加入待删除更改吗？`} confirmText="加入待删除" loading={saving} onConfirm={handleRemove} onCancel={() => setRemoveTarget(null)} />}
+      {discardOpen && <ConfirmDialog title="放弃全部更改" message="所有未保存的应用修改和删除操作都会丢失，是否继续？" confirmText="放弃更改" loading={saving} onConfirm={discardChanges} onCancel={() => setDiscardOpen(false)} />}
+      {toast && <div role="status" className={`fixed bottom-6 right-6 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>{toast.message}</div>}
     </AdminLayout>
   )
 }

@@ -1,17 +1,13 @@
 package com.object.ai.craft.api.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
-import com.object.ai.craft.api.model.app.AppAddRequest;
-import com.object.ai.craft.api.model.app.AppAdminPageRequest;
-import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
-import com.object.ai.craft.api.model.app.AppPageRequest;
-import com.object.ai.craft.api.model.app.AppUpdateRequest;
-import com.object.ai.craft.api.model.app.AppVO;
+import com.object.ai.craft.api.model.app.*;
 import com.object.ai.craft.domain.app.model.App;
 import com.object.ai.craft.domain.app.service.AppService;
 import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.domain.user.service.UserService;
 import com.object.ai.craft.types.common.BaseResponse;
+import com.object.ai.craft.types.common.DataContainer;
 import com.object.ai.craft.types.common.PageResult;
 import com.object.ai.craft.types.common.ResultUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,14 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.Set;
@@ -95,20 +84,6 @@ public class AppController {
     }
 
     @SaCheckRole("admin")
-    @Operation(summary = "管理员更新应用", description = "可更新应用名称、封面和优先级")
-    @PutMapping("admin/update")
-    public BaseResponse<Boolean> updateByAdmin(@Valid @RequestBody AppAdminUpdateRequest request) {
-        return ResultUtil.success(appService.updateByAdmin(request));
-    }
-
-    @SaCheckRole("admin")
-    @Operation(summary = "管理员删除应用")
-    @DeleteMapping("admin/remove/{id}")
-    public BaseResponse<Boolean> removeByAdmin(@Parameter(description = "应用 ID", required = true) @PathVariable String id) {
-        return ResultUtil.success(appService.removeByAdmin(id));
-    }
-
-    @SaCheckRole("admin")
     @Operation(summary = "管理员获取应用详情", description = "可查询包含逻辑删除记录的应用")
     @GetMapping("admin/getInfo/{id}")
     public BaseResponse<AppVO> getInfoByAdmin(@Parameter(description = "应用 ID", required = true) @PathVariable String id) {
@@ -120,6 +95,13 @@ public class AppController {
     @GetMapping("admin/page")
     public BaseResponse<PageResult<AppVO>> pageByAdmin(@Valid @ParameterObject AppAdminPageRequest request) {
         return ResultUtil.success(toVOPage(appService.pageByAdmin(request)));
+    }
+
+    @SaCheckRole("admin")
+    @Operation(summary = "管理员批量管理应用", description = "管理员更新、删除应用的唯一写入入口")
+    @PostMapping("admin/batchSave")
+    public BaseResponse<Boolean> batchSaveAdmin(@Valid @RequestBody DataContainer<AppBatchSaveRequest> dataContainer) {
+        return ResultUtil.success(appService.batchSaveAdmin(dataContainer));
     }
 
     private PageResult<AppVO> toVOPage(PageResult<App> result) {

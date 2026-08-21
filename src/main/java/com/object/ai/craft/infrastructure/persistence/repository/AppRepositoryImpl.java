@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.mybatisflex.core.logicdelete.LogicDeleteManager;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.row.Db;
 import com.object.ai.craft.api.model.app.AppAdminPageRequest;
 import com.object.ai.craft.api.model.app.AppPageRequest;
 import com.object.ai.craft.domain.app.model.App;
@@ -15,6 +16,7 @@ import com.object.ai.craft.types.common.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -42,8 +44,25 @@ public class AppRepositoryImpl implements AppRepository {
     }
 
     @Override
+    public boolean updateBatchById(Collection<App> apps) {
+        if (apps == null || apps.isEmpty()) {
+            return true;
+        }
+        List<AppPO> appPOs = apps.stream().map(this::toPO).toList();
+        return LogicDeleteManager.execWithoutLogicDelete(() -> Db.updateEntitiesBatch(appPOs) == apps.size());
+    }
+
+    @Override
     public boolean removeById(String id) {
         return appMapper.deleteById(id) > 0;
+    }
+
+    @Override
+    public boolean removeByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return true;
+        }
+        return appMapper.deleteBatchByIds(ids) == ids.size();
     }
 
     @Override
@@ -87,12 +106,10 @@ public class AppRepositoryImpl implements AppRepository {
                 .like(AppPO::getDeployKey, request.getDeployKey(), value -> value != null && !value.isBlank())
                 .eq(AppPO::getPriority, request.getPriority(), value -> value != null)
                 .eq(AppPO::getUserId, request.getUserId(), value -> value != null && !value.isBlank())
-                .eq(AppPO::getIsDelete, request.getIsDelete(), value -> value != null)
                 .orderBy(AppPO::getPriority, false)
                 .orderBy(AppPO::getEditTime, false);
-        return LogicDeleteManager.execWithoutLogicDelete(
-                () -> paginate(request.getCurrent(), request.getPageSize(), queryWrapper)
-        );
+        // 管理员列表仍遵循逻辑删除约束，不展示已删除应用。
+        return paginate(request.getCurrent(), request.getPageSize(), queryWrapper);
     }
 
     private PageResult<App> paginate(long current, long pageSize, QueryWrapper queryWrapper) {

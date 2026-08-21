@@ -49,9 +49,16 @@ export interface AppUpdateRequest {
   appName: string
 }
 
-/** 管理员更新应用请求体，与后端 AppAdminUpdateRequest 对齐。 */
-export interface AppAdminUpdateRequest {
-  id: string
+/** 与后端 DataContainer<T> 对齐的批量数据容器。 */
+export interface DataContainer<T> {
+  createData: T[]
+  modifyData: T[]
+  removeData: T[]
+}
+
+/** 管理员批量管理应用的数据项，与后端 AppBatchSaveRequest 对齐。 */
+export interface AppBatchSaveRequest {
+  id?: string
   appName?: string
   cover?: string
   priority?: number
@@ -91,10 +98,6 @@ export const deployApp = (id: string) =>
 export const adminPageApps = (params: AppAdminPageQuery) =>
   request<PageResult<AppVO>>({ url: '/app/admin/page', method: 'get', params })
 
-/** 管理员更新应用名称、封面与优先级。 */
-export const adminUpdateApp = (data: AppAdminUpdateRequest) =>
-  request<boolean>({ url: '/app/admin/update', method: 'put', data })
-
-/** 管理员删除应用。 */
-export const adminRemoveApp = (id: string) =>
-  request<boolean>({ url: `/app/admin/remove/${id}`, method: 'delete' })
+/** 管理员批量保存应用修改和删除操作。 */
+export const batchSaveAdminApps = (data: DataContainer<AppBatchSaveRequest>) =>
+  request<boolean>({ url: '/app/admin/batchSave', method: 'post', data })
