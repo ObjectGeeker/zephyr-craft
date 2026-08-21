@@ -57,8 +57,8 @@ class AppControllerTest {
         ArgumentCaptor<Collection<String>> idsCaptor = ArgumentCaptor.captor();
         verify(userService).listByIds(idsCaptor.capture());
         assertEquals(List.of("user-1"), idsCaptor.getValue().stream().sorted().toList());
-        assertEquals("用户", response.getData().getRecords().getFirst().getUser().getUsername());
-        assertEquals("account", response.getData().getRecords().getFirst().getUser().getAccount());
+        assertEquals("用户", response.getData().getRecords().get(0).getUser().getUsername());
+        assertEquals("account", response.getData().getRecords().get(0).getUser().getAccount());
     }
 
     @Test
@@ -78,7 +78,7 @@ class AppControllerTest {
 
         BaseResponse<PageResult<AppVO>> response = appController.pageFeatured(request);
 
-        AppVO result = response.getData().getRecords().getFirst();
+        AppVO result = response.getData().getRecords().get(0);
         assertEquals(AppPriority.FEATURED, result.getPriority());
         assertEquals("用户", result.getUser().getUsername());
         assertNull(result.getInitPrompt());

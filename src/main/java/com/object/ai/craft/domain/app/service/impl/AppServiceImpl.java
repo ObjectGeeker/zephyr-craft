@@ -1,5 +1,8 @@
 package com.object.ai.craft.domain.app.service.impl;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import com.object.ai.craft.api.model.app.AppAddRequest;
 import com.object.ai.craft.api.model.app.AppAdminPageRequest;
 import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
@@ -12,11 +15,14 @@ import com.object.ai.craft.domain.app.service.AppService;
 import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.domain.user.service.UserService;
 import com.object.ai.craft.types.common.PageResult;
+import com.object.ai.craft.types.constant.AppConstant;
 import com.object.ai.craft.types.exception.ErrorCode;
 import com.object.ai.craft.types.exception.ThrowUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.time.LocalDateTime;
 
 /**
@@ -28,8 +34,16 @@ public class AppServiceImpl implements AppService {
 
     private static final String DEFAULT_APP_NAME = "未命名应用";
 
+    /**
+     * 部署标识长度，随机生成的位数。
+     */
+    private static final int DEPLOY_KEY_LENGTH = 16;
+
     private final AppRepository appRepository;
     private final UserService userService;
+
+    @Value("${deploy.nginx-base-url}")
+    private String nginxBaseUrl;
 
     @Override
     public App create(AppAddRequest request) {
@@ -112,6 +126,27 @@ public class AppServiceImpl implements AppService {
     @Override
     public PageResult<App> pageByAdmin(AppAdminPageRequest request) {
         return appRepository.pageAdmin(request);
+    }
+
+    @Override
+    public String deployApp(String appId) {
+        App app = getMyApp(appId);
+        ThrowUtil.throwIf(!hasText(app.getCodeGenType()), ErrorCode.PARAMS_ERROR, "应用尚未生成代码，无法部署");
+        // 与 CodeFileSaver 的目录命名规则保持一致：codeGenType_appId
+        String sourceDir = AppConstant.APP_CODE_OUTPUT_DIR + File.separator + app.getCodeGenType() + "_" + appId;
+        ThrowUtil.throwIf(!FileUtil.exist(sourceDir), ErrorCode.NOT_FOUND_ERROR, "未找到代码生成产物，请先生成代码");
+
+        // 已有部署标识则复用，保证重复部署后访问地址稳定
+        String deployKey = StrUtil.blankToDefault(app.getDeployKey(), RandomUtil.randomString(DEPLOY_KEY_LENGTH));
+        String deployDirName = app.getCodeGenType() + "_" + appId + "_" + deployKey;
+        String deployDir = AppConstant.APP_CODE_DEPLOY_DIR + File.separator + deployDirName;
+        FileUtil.mkdir(deployDir);
+        FileUtil.copyContent(new File(sourceDir), new File(deployDir), true);
+
+        app.setDeployKey(deployKey);
+        app.setDeployedTime(LocalDateTime.now());
+        ThrowUtil.throwIf(!appRepository.updateById(app), ErrorCode.SYSTEM_ERROR, "部署信息保存失败");
+        return nginxBaseUrl + "/sites/" + deployDirName;
     }
 
     /**

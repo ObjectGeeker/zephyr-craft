@@ -1,5 +1,6 @@
 package com.object.ai.craft.domain.app.service;
 
+import cn.hutool.core.io.FileUtil;
 import com.object.ai.craft.api.model.app.AppAddRequest;
 import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
 import com.object.ai.craft.api.model.app.AppUpdateRequest;
@@ -9,16 +10,22 @@ import com.object.ai.craft.domain.app.repository.AppRepository;
 import com.object.ai.craft.domain.app.service.impl.AppServiceImpl;
 import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.domain.user.service.UserService;
+import com.object.ai.craft.types.constant.AppConstant;
 import com.object.ai.craft.types.exception.BusinessException;
 import com.object.ai.craft.types.exception.ErrorCode;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.io.File;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +48,19 @@ class AppServiceTest {
 
     @InjectMocks
     private AppServiceImpl appService;
+
+    private File generatedSourceDir;
+    private File deployedDir;
+
+    @AfterEach
+    void cleanUpDeployFiles() {
+        if (generatedSourceDir != null) {
+            FileUtil.del(generatedSourceDir);
+        }
+        if (deployedDir != null) {
+            FileUtil.del(deployedDir);
+        }
+    }
 
     @Test
     void createShouldUseDefaultNameAndCurrentUser() {
@@ -106,6 +126,56 @@ class AppServiceTest {
         assertTrue(appService.removeMy("app-4"));
 
         verify(appRepository).removeById("app-4");
+    }
+
+    @Test
+    void deployAppShouldRejectAnotherUsersApp() {
+        when(appRepository.getById("app-5")).thenReturn(App.builder().id("app-5").userId("user-2").build());
+        when(userService.getLoginUser()).thenReturn(User.builder().id("user-1").build());
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> appService.deployApp("app-5"));
+
+        assertEquals(ErrorCode.FORBIDDEN_ERROR.getCode(), exception.getCode());
+    }
+
+    @Test
+    void deployAppShouldCopyGeneratedCodeAndReturnUrl() {
+        App app = App.builder().id("app-deploy").codeGenType("HTML").userId("user-1").build();
+        when(appRepository.getById("app-deploy")).thenReturn(app);
+        when(userService.getLoginUser()).thenReturn(User.builder().id("user-1").build());
+        when(appRepository.updateById(any(App.class))).thenReturn(true);
+        generatedSourceDir = FileUtil.mkdir(AppConstant.APP_CODE_OUTPUT_DIR + File.separator + "HTML_app-deploy");
+        FileUtil.writeUtf8String("<html></html>", generatedSourceDir.getPath() + File.separator + "index.html");
+        ReflectionTestUtils.setField(appService, "nginxBaseUrl", "http://localhost:8082");
+
+        String url = appService.deployApp("app-deploy");
+
+        ArgumentCaptor<App> captor = ArgumentCaptor.forClass(App.class);
+        verify(appRepository).updateById(captor.capture());
+        String deployKey = captor.getValue().getDeployKey();
+        assertNotNull(captor.getValue().getDeployedTime());
+        assertEquals(16, deployKey.length());
+        assertEquals("http://localhost:8082/sites/HTML_app-deploy_" + deployKey, url);
+        deployedDir = new File(AppConstant.APP_CODE_DEPLOY_DIR + File.separator + "HTML_app-deploy_" + deployKey);
+        assertEquals("<html></html>", FileUtil.readUtf8String(deployedDir.getPath() + File.separator + "index.html"));
+    }
+
+    @Test
+    void deployAppShouldReuseExistingDeployKey() {
+        App app = App.builder().id("app-deploy").codeGenType("HTML")
+                .deployKey("existingkey12345").userId("user-1").build();
+        when(appRepository.getById("app-deploy")).thenReturn(app);
+        when(userService.getLoginUser()).thenReturn(User.builder().id("user-1").build());
+        when(appRepository.updateById(any(App.class))).thenReturn(true);
+        generatedSourceDir = FileUtil.mkdir(AppConstant.APP_CODE_OUTPUT_DIR + File.separator + "HTML_app-deploy");
+        FileUtil.writeUtf8String("<html></html>", generatedSourceDir.getPath() + File.separator + "index.html");
+        ReflectionTestUtils.setField(appService, "nginxBaseUrl", "http://localhost:8082");
+
+        String url = appService.deployApp("app-deploy");
+
+        assertEquals("http://localhost:8082/sites/HTML_app-deploy_existingkey12345", url);
+        deployedDir = new File(AppConstant.APP_CODE_DEPLOY_DIR + File.separator + "HTML_app-deploy_existingkey12345");
+        assertTrue(FileUtil.exist(deployedDir.getPath() + File.separator + "index.html"));
     }
 
 }

@@ -70,6 +70,12 @@ public class AppController {
         return ResultUtil.success(toVO(appService.getMyById(id)));
     }
 
+    @Operation(summary = "部署应用", description = "将应用最新生成的代码发布到部署目录并返回访问地址")
+    @PostMapping("deploy/{id}")
+    public BaseResponse<String> deploy(@Parameter(description = "应用 ID", required = true) @PathVariable String id) {
+        return ResultUtil.success(appService.deployApp(id));
+    }
+
     @Operation(summary = "分页查询我的应用")
     @GetMapping("my/page")
     public BaseResponse<PageResult<AppVO>> pageMy(@Valid @ParameterObject AppPageRequest request) {

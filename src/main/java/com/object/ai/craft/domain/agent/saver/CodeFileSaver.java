@@ -3,6 +3,7 @@ package com.object.ai.craft.domain.agent.saver;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import com.object.ai.craft.domain.agent.model.CodeGenEnum;
+import com.object.ai.craft.types.constant.AppConstant;
 import com.object.ai.craft.types.exception.BusinessException;
 import com.object.ai.craft.types.exception.ErrorCode;
 
@@ -15,7 +16,7 @@ import java.io.File;
  */
 public abstract class CodeFileSaver<T> {
 
-    public static final String FILE_SAVE_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
+    public static final String FILE_SAVE_ROOT_DIR = AppConstant.APP_CODE_OUTPUT_DIR;
 
     /**
      * 该保存器支持的生成类型。
