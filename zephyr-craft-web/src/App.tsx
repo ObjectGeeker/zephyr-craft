@@ -4,6 +4,9 @@ import Hero from './components/Hero'
 import CaseShowcase from './components/CaseShowcase'
 import LoginPage from './pages/LoginPage'
 import AdminPage from './pages/AdminPage'
+import AdminAppsPage from './pages/AdminAppsPage'
+import MyAppsPage from './pages/MyAppsPage'
+import GeneratePage from './pages/GeneratePage'
 import { UserProvider } from './store/user'
 
 function HomePage() {
@@ -24,7 +27,10 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/generate/:appId" element={<GeneratePage />} />
+        <Route path="/my-apps" element={<MyAppsPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/apps" element={<AdminAppsPage />} />
       </Routes>
     </UserProvider>
   )

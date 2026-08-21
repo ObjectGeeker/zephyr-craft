@@ -26,6 +26,7 @@ import java.io.File;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,6 +82,7 @@ class AppServiceTest {
         assertEquals("未命名应用", captor.getValue().getAppName());
         assertEquals("user-1", captor.getValue().getUserId());
         assertEquals(AppPriority.NORMAL, captor.getValue().getPriority());
+        assertEquals("HTML", captor.getValue().getCodeGenType());
         assertEquals("app-1", result.getId());
     }
 
@@ -126,6 +128,43 @@ class AppServiceTest {
         assertTrue(appService.removeMy("app-4"));
 
         verify(appRepository).removeById("app-4");
+    }
+
+    @Test
+    void previewAppShouldRejectAnotherUsersApp() {
+        when(appRepository.getById("app-6")).thenReturn(App.builder().id("app-6").userId("user-2").build());
+        when(userService.getLoginUser()).thenReturn(User.builder().id("user-1").build());
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> appService.previewApp("app-6"));
+
+        assertEquals(ErrorCode.FORBIDDEN_ERROR.getCode(), exception.getCode());
+    }
+
+    @Test
+    void previewAppShouldRequireGeneratedCode() {
+        App app = App.builder().id("app-nocode").userId("user-1").build();
+        when(appRepository.getById("app-nocode")).thenReturn(app);
+        when(userService.getLoginUser()).thenReturn(User.builder().id("user-1").build());
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> appService.previewApp("app-nocode"));
+
+        assertEquals(ErrorCode.PARAMS_ERROR.getCode(), exception.getCode());
+    }
+
+    @Test
+    void previewAppShouldReturnUrlWithoutDeployStateChange() {
+        App app = App.builder().id("app-preview").codeGenType("HTML").userId("user-1").build();
+        when(appRepository.getById("app-preview")).thenReturn(app);
+        when(userService.getLoginUser()).thenReturn(User.builder().id("user-1").build());
+        generatedSourceDir = FileUtil.mkdir(AppConstant.APP_CODE_OUTPUT_DIR + File.separator + "HTML_app-preview");
+        FileUtil.writeUtf8String("<html></html>", generatedSourceDir.getPath() + File.separator + "index.html");
+        ReflectionTestUtils.setField(appService, "previewBaseUrl", "http://localhost:8080/api");
+
+        String url = appService.previewApp("app-preview");
+
+        assertEquals("http://localhost:8080/api/preview/HTML_app-preview", url);
+        assertNull(app.getDeployKey());
+        assertNull(app.getDeployedTime());
     }
 
     @Test

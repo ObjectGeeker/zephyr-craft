@@ -115,6 +115,15 @@ export default function TopNav() {
               tabIndex={0}
               className="dropdown-content menu z-20 mt-2 w-44 rounded-xl border border-line bg-white p-1.5 shadow-lg shadow-brand/10"
             >
+              <li>
+                <button
+                  type="button"
+                  onClick={() => navigate('/my-apps')}
+                  className="cursor-pointer rounded-lg px-3 py-2 text-sm text-ink-muted transition-colors duration-200 hover:bg-mist hover:text-brand focus-visible:outline-2 focus-visible:outline-brand"
+                >
+                  个人中心
+                </button>
+              </li>
               {currentUser.role === 'admin' && (
                 <li>
                   <button

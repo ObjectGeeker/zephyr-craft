@@ -8,6 +8,7 @@ import com.object.ai.craft.api.model.app.AppAdminPageRequest;
 import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
 import com.object.ai.craft.api.model.app.AppPageRequest;
 import com.object.ai.craft.api.model.app.AppUpdateRequest;
+import com.object.ai.craft.domain.agent.model.CodeGenEnum;
 import com.object.ai.craft.domain.app.model.App;
 import com.object.ai.craft.domain.app.model.AppPriority;
 import com.object.ai.craft.domain.app.repository.AppRepository;
@@ -45,12 +46,17 @@ public class AppServiceImpl implements AppService {
     @Value("${deploy.nginx-base-url}")
     private String nginxBaseUrl;
 
+    @Value("${deploy.preview-base-url}")
+    private String previewBaseUrl;
+
     @Override
     public App create(AppAddRequest request) {
         User loginUser = userService.getLoginUser();
         App app = App.builder()
                 .appName(hasText(request.getAppName()) ? request.getAppName() : DEFAULT_APP_NAME)
                 .initPrompt(request.getInitPrompt())
+                // 生成类型暂固定为 HTML，后续改为动态路由生成
+                .codeGenType(CodeGenEnum.HTML.name())
                 .priority(AppPriority.NORMAL)
                 .userId(loginUser.getId())
                 .build();
@@ -129,12 +135,16 @@ public class AppServiceImpl implements AppService {
     }
 
     @Override
+    public String previewApp(String appId) {
+        App app = getMyApp(appId);
+        getCodeSourceDir(app);
+        return previewBaseUrl + "/preview/" + app.getCodeGenType() + "_" + appId;
+    }
+
+    @Override
     public String deployApp(String appId) {
         App app = getMyApp(appId);
-        ThrowUtil.throwIf(!hasText(app.getCodeGenType()), ErrorCode.PARAMS_ERROR, "应用尚未生成代码，无法部署");
-        // 与 CodeFileSaver 的目录命名规则保持一致：codeGenType_appId
-        String sourceDir = AppConstant.APP_CODE_OUTPUT_DIR + File.separator + app.getCodeGenType() + "_" + appId;
-        ThrowUtil.throwIf(!FileUtil.exist(sourceDir), ErrorCode.NOT_FOUND_ERROR, "未找到代码生成产物，请先生成代码");
+        String sourceDir = getCodeSourceDir(app);
 
         // 已有部署标识则复用，保证重复部署后访问地址稳定
         String deployKey = StrUtil.blankToDefault(app.getDeployKey(), RandomUtil.randomString(DEPLOY_KEY_LENGTH));
@@ -147,6 +157,17 @@ public class AppServiceImpl implements AppService {
         app.setDeployedTime(LocalDateTime.now());
         ThrowUtil.throwIf(!appRepository.updateById(app), ErrorCode.SYSTEM_ERROR, "部署信息保存失败");
         return nginxBaseUrl + "/sites/" + deployDirName;
+    }
+
+    /**
+     * 校验应用已生成代码且产物目录存在，返回与 CodeFileSaver 命名规则一致的源目录。
+     */
+    private String getCodeSourceDir(App app) {
+        ThrowUtil.throwIf(!hasText(app.getCodeGenType()), ErrorCode.PARAMS_ERROR, "应用尚未生成代码");
+        // 与 CodeFileSaver 的目录命名规则保持一致：codeGenType_appId
+        String sourceDir = AppConstant.APP_CODE_OUTPUT_DIR + File.separator + app.getCodeGenType() + "_" + app.getId();
+        ThrowUtil.throwIf(!FileUtil.exist(sourceDir), ErrorCode.NOT_FOUND_ERROR, "未找到代码生成产物，请先生成代码");
+        return sourceDir;
     }
 
     /**

@@ -104,6 +104,18 @@ public interface AppService {
     PageResult<App> pageByAdmin(AppAdminPageRequest request);
 
     /**
+     * 获取当前登录用户拥有应用的预览地址。
+     *
+     * <p>校验应用归属与生成产物存在后，返回后端直接托管的预览 URL，
+     * 仅用于部署前预览，不产生部署标识等状态变更。</p>
+     *
+     * @param appId 应用主键
+     * @return 预览访问 URL
+     * @throws com.object.ai.craft.types.exception.BusinessException 应用不存在、用户未登录或无权操作、尚未生成代码时抛出
+     */
+    String previewApp(String appId);
+
+    /**
      * 部署当前登录用户拥有的应用。
      *
      * <p>校验应用归属后，复用或随机生成部署标识，将代码生成产物复制到部署目录，

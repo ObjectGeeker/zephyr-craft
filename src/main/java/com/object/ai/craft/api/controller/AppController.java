@@ -70,6 +70,12 @@ public class AppController {
         return ResultUtil.success(toVO(appService.getMyById(id)));
     }
 
+    @Operation(summary = "预览应用", description = "返回应用生成代码的预览地址，部署前即可预览，不产生部署状态")
+    @GetMapping("preview/{id}")
+    public BaseResponse<String> preview(@Parameter(description = "应用 ID", required = true) @PathVariable String id) {
+        return ResultUtil.success(appService.previewApp(id));
+    }
+
     @Operation(summary = "部署应用", description = "将应用最新生成的代码发布到部署目录并返回访问地址")
     @PostMapping("deploy/{id}")
     public BaseResponse<String> deploy(@Parameter(description = "应用 ID", required = true) @PathVariable String id) {

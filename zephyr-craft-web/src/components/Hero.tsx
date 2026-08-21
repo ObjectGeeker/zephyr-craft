@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
+import { createApp } from '../api/app'
+import { BusinessError } from '../api/request'
 import { useUser } from '../store/useUser'
 
 const QUICK_PROMPTS = [
@@ -12,17 +14,30 @@ const QUICK_PROMPTS = [
 
 export default function Hero() {
   const [value, setValue] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
   const reduceMotion = useReducedMotion()
   const navigate = useNavigate()
   const { currentUser } = useUser()
 
-  const handleSubmit = () => {
-    if (!value.trim()) return
+  const handleSubmit = async () => {
+    const prompt = value.trim()
+    if (!prompt || creating) return
     if (!currentUser) {
       navigate('/login')
       return
     }
-    console.log('提交建站描述:', value.trim())
+    setCreating(true)
+    setError('')
+    try {
+      // 先创建应用拿到 appId，再进入生成页发起流式代码生成
+      const app = await createApp({ initPrompt: prompt })
+      navigate(`/generate/${app.id}`, { state: { prompt } })
+    } catch (err) {
+      setError(err instanceof BusinessError ? err.message : '应用创建失败，请稍后重试')
+    } finally {
+      setCreating(false)
+    }
   }
 
   return (
@@ -69,20 +84,31 @@ export default function Hero() {
             <button
               type="button"
               onClick={handleSubmit}
+              disabled={creating}
               aria-label="生成网站"
-              className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-brand text-white transition-all duration-200 hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-95"
+              className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-brand text-white transition-all duration-200 hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M4 11.5 20 4l-4.5 16-4-6.5L4 11.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinejoin="round"
-                />
-                <path d="m11.5 13.5 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
+              {creating ? (
+                <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M4 11.5 20 4l-4.5 16-4-6.5L4 11.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                  />
+                  <path d="m11.5 13.5 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              )}
             </button>
           </div>
+
+          {error && (
+            <p className="mt-3 text-sm text-red-500" role="alert">
+              {error}
+            </p>
+          )}
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             {QUICK_PROMPTS.map((item) => (

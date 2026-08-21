@@ -11,10 +11,10 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * 部署产物静态托管配置。
+ * 生成产物静态托管配置，用于部署前的应用预览。
  *
- * <p>开发阶段不部署 nginx 时，由后端直接托管 {@code tmp/code_deploy} 下的部署产物，
- * 路径形态与 nginx 保持一致（/sites/{部署目录}），上线后切换 deploy.nginx-base-url 即可。</p>
+ * <p>将 /preview/** 映射到 {@code tmp/code_output} 生成产物目录；部署产物
+ * （{@code tmp/code_deploy}）不经过后端，由 nginx 通过 /sites/** 直接对外提供。</p>
  */
 @Configuration
 public class PreviewResourceConfig implements WebMvcConfigurer {
@@ -23,8 +23,8 @@ public class PreviewResourceConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/sites/**")
-                .addResourceLocations("file:" + AppConstant.APP_CODE_DEPLOY_DIR + File.separator)
+        registry.addResourceHandler("/preview/**")
+                .addResourceLocations("file:" + AppConstant.APP_CODE_OUTPUT_DIR + File.separator)
                 .resourceChain(true)
                 .addResolver(new PathResourceResolver() {
                     @Override
@@ -37,7 +37,7 @@ public class PreviewResourceConfig implements WebMvcConfigurer {
                             }
                             return resource;
                         }
-                        // 不带尾斜杠的目录路径（如 /sites/{部署目录}）
+                        // 不带尾斜杠的目录路径（如 /preview/{codeGenType}_{appId}）
                         return resolveIndex(location, resourcePath);
                     }
 
