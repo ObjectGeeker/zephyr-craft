@@ -45,12 +45,12 @@ public abstract class CodeFileSaver<T> {
      * @param result 解析结果
      * @return 保存目录
      */
-    public final File save(Object result) {
+    public final File save(Object result, String appId) {
         if (result == null || !resultType().isInstance(result)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "不支持的保存结果类型！");
         }
 
-        String dirPath = buildUniqueDir(supportType().name());
+        String dirPath = buildUniqueDir(supportType().name(), appId);
         writeFiles(dirPath, resultType().cast(result));
         return new File(dirPath);
     }
@@ -73,8 +73,8 @@ public abstract class CodeFileSaver<T> {
      * @param bizType 业务类型
      * @return 文件目录
      */
-    private String buildUniqueDir(String bizType) {
-        String uniqueDir = FILE_SAVE_ROOT_DIR + File.separator + bizType + "_" + IdUtil.getSnowflakeNextIdStr();
+    private String buildUniqueDir(String bizType, String appId) {
+        String uniqueDir = FILE_SAVE_ROOT_DIR + File.separator + bizType + "_" + appId;
         FileUtil.mkdir(uniqueDir);
         return uniqueDir;
     }

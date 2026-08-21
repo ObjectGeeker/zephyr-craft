@@ -17,4 +17,7 @@ public class CodeGenRequest {
     @NotNull(message = "必须指定生成类型！")
     private CodeGenEnum type;
 
+    @NotNull(message = "应用ID")
+    private String appId;
+
 }

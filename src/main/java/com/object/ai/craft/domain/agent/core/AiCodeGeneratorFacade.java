@@ -42,14 +42,14 @@ public class AiCodeGeneratorFacade {
      * @param codeGenEnum 生成类型
      * @return 保存的目录
      */
-    public File generateAndSaveCode(String userMessage, CodeGenEnum codeGenEnum) {
+    public File generateAndSaveCode(String userMessage, CodeGenEnum codeGenEnum, String appId) {
         if (null == codeGenEnum) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "必须指定生成类型！");
         }
 
         return switch (codeGenEnum) {
-            case HTML -> generateAndSaveHtmlCode(userMessage);
-            case MULTI_FILE -> generateAndSaveMultiHtmlCode(userMessage);
+            case HTML -> generateAndSaveHtmlCode(userMessage, appId);
+            case MULTI_FILE -> generateAndSaveMultiHtmlCode(userMessage, appId);
             default -> throw new BusinessException(ErrorCode.PARAMS_ERROR, "不支持的生成类型！");
         };
     }
@@ -87,7 +87,7 @@ public class AiCodeGeneratorFacade {
      * @param codeGenEnum 生成类型
      * @param emitter SSE 响应发送器
      */
-    public void generateCodeStream(String userMessage, CodeGenEnum codeGenEnum, SseEmitter emitter) {
+    public void generateCodeStream(String userMessage, CodeGenEnum codeGenEnum, SseEmitter emitter, String appId) {
         if (emitter == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "SseEmitter 不能为空！");
         }
@@ -96,7 +96,7 @@ public class AiCodeGeneratorFacade {
         generateCodeStream(userMessage, codeGenEnum).subscribe(
                 chunk -> handleStreamChunk(emitter, fullResponse, chunk),
                 error -> handleStreamError(emitter, error),
-                () -> handleStreamComplete(emitter, codeGenEnum, fullResponse.toString())
+                () -> handleStreamComplete(emitter, codeGenEnum, fullResponse.toString(), appId)
         );
     }
 
@@ -111,9 +111,9 @@ public class AiCodeGeneratorFacade {
         }
     }
 
-    private void handleStreamComplete(SseEmitter emitter, CodeGenEnum codeGenEnum, String fullResponse) {
+    private void handleStreamComplete(SseEmitter emitter, CodeGenEnum codeGenEnum, String fullResponse, String appId) {
         try {
-            File outputDirectory = parseAndSaveCode(fullResponse, codeGenEnum);
+            File outputDirectory = parseAndSaveCode(fullResponse, codeGenEnum, appId);
             emitter.send(SseEmitter.event()
                     .name("complete")
                     .data(outputDirectory.getAbsolutePath()));
@@ -139,19 +139,19 @@ public class AiCodeGeneratorFacade {
         }
     }
 
-    private File parseAndSaveCode(String fullResponse, CodeGenEnum codeGenEnum) {
+    private File parseAndSaveCode(String fullResponse, CodeGenEnum codeGenEnum, String appId) {
         Object result = codeParserFactory.getParser(codeGenEnum).parse(fullResponse);
-        return codeFileSaverFactory.getSaver(codeGenEnum).save(result);
+        return codeFileSaverFactory.getSaver(codeGenEnum).save(result, appId);
     }
 
-    private File generateAndSaveMultiHtmlCode(String userMessage) {
+    private File generateAndSaveMultiHtmlCode(String userMessage, String appId) {
         MultiHtmlCodeResult multiHtmlCodeResult = aiCodeGeneratorService.generateMultiHtmlCode(userMessage);
-        return codeFileSaverFactory.getSaver(CodeGenEnum.MULTI_FILE).save(multiHtmlCodeResult);
+        return codeFileSaverFactory.getSaver(CodeGenEnum.MULTI_FILE).save(multiHtmlCodeResult, appId);
     }
 
-    private File generateAndSaveHtmlCode(String userMessage) {
+    private File generateAndSaveHtmlCode(String userMessage, String appId) {
         HtmlCodeResult htmlCodeResult = aiCodeGeneratorService.generateHtmlCode(userMessage);
-        return codeFileSaverFactory.getSaver(CodeGenEnum.HTML).save(htmlCodeResult);
+        return codeFileSaverFactory.getSaver(CodeGenEnum.HTML).save(htmlCodeResult, appId);
     }
 
 }

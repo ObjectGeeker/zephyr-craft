@@ -34,7 +34,7 @@ public class AiCodeGenerateTest {
 
     @Test
     void generateAndSaveCode() {
-        File file = aiCodeGeneratorFacade.generateAndSaveCode("简单生成一个自我介绍的主页，我是一名工作三年的Java开发程序员，名字是Zephyr，不超过200行代码", CodeGenEnum.MULTI_FILE);
+        File file = aiCodeGeneratorFacade.generateAndSaveCode("简单生成一个自我介绍的主页，我是一名工作三年的Java开发程序员，名字是Zephyr，不超过200行代码", CodeGenEnum.MULTI_FILE, "1");
         log.info("生成结果: {}", file.getAbsoluteFile());
     }
 

@@ -1,7 +1,9 @@
 package com.object.ai.craft.api.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.object.ai.craft.api.model.codegen.CodeGenRequest;
 import com.object.ai.craft.domain.agent.core.AiCodeGeneratorFacade;
+import com.object.ai.craft.domain.app.service.AppService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,18 +30,21 @@ public class CodeGenController {
     private static final long SSE_TIMEOUT = 5 * 60 * 1000L;
 
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    private final AppService appService;
 
     /**
      * 流式生成代码，通过 SSE 推送生成过程。
      */
     @Operation(summary = "流式生成代码（SSE）", description = "以 SSE 事件持续返回代码片段、完成结果或错误信息")
     @PostMapping(value = "generateStream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @SaCheckLogin
     public SseEmitter generateStream(@Valid @RequestBody CodeGenRequest request) {
+        appService.getMyById(request.getAppId());
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
         emitter.onTimeout(emitter::complete);
         emitter.onError(error -> emitter.complete());
         aiCodeGeneratorFacade.generateCodeStream(
-                request.getUserMessage(), request.getType(), emitter);
+                request.getUserMessage(), request.getType(), emitter, request.getAppId());
         return emitter;
     }
 
