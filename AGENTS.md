@@ -59,7 +59,10 @@ npm run build
 - 为新领域对象创建领域模型、仓储接口，以及 `infrastructure/persistence` 下的 PO、Mapper、仓储实现。数据库变更同步写入 `dev-ops/sql/init.sql`。
 - API 请求体放在 `api/model/<domain>/`，使用 Jakarta Validation 注解并在 Controller 参数处添加 `@Valid`。对外响应使用 VO，避免暴露领域实体、PO、密码或内部字段。
 - Controller 通过 `ResultUtil.success(...)` 返回 `BaseResponse<T>`；业务失败使用 `BusinessException`、`ErrorCode` 和 `ThrowUtil`，由 `GlobalExceptionHandler` 统一转换，避免在业务代码中自行拼装错误响应。
+- 所有 Controller 必须使用 Knife4j/OpenAPI 注解：类上添加带名称和描述的 `@Tag`，每个 HTTP 映射方法添加 `@Operation`；路径变量使用 `@Parameter` 说明，分页或筛选等 POJO 查询参数使用 `@ParameterObject` 展开字段，便于在接口文档中调试。
 - 需鉴权的接口使用 Sa-Token 注解，例如管理员接口使用 `@SaCheckRole("admin")`；鉴权规则需同时在服务端落实，不能只依赖前端页面限制。
+- 业务领域服务采用接口与实现分离：接口位于 `domain/<domain>/service/`，实现位于 `domain/<domain>/service/impl/` 并命名为 `XxxServiceImpl`。调用方只能依赖 `XxxService` 接口；`@Service`、`@RequiredArgsConstructor` 等 Spring 或注入注解只标注在实现类上。LangChain 等框架动态代理所需的服务接口可保持其原有形态。
+- 每个领域服务接口的方法必须有完整 Javadoc，说明职责、关键鉴权或会话副作用、`@param`、`@return`，以及必要的异常条件；实现类只为非直观的业务规则、权限校验或数据一致性约束补充关键注释，避免重复接口文档。
 - 持久化实现使用 MyBatis-Flex。保持领域对象与 PO 的显式转换，查询条件使用 `QueryWrapper`，避免将数据库类型扩散到领域层。
 - 新增或修改 AI 代码生成输出格式时，同步检查 `src/main/resources/prompt/` 中相应系统提示词、解析器和保存器，保持三者协议一致。
 - 延续现有 Java 风格：4 空格缩进、类名 PascalCase、方法/字段 camelCase、包名全小写；优先使用 Lombok 的 `@RequiredArgsConstructor` 进行构造器注入。

@@ -6,112 +6,101 @@ import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
 import com.object.ai.craft.api.model.app.AppPageRequest;
 import com.object.ai.craft.api.model.app.AppUpdateRequest;
 import com.object.ai.craft.domain.app.model.App;
-import com.object.ai.craft.domain.app.repository.AppRepository;
-import com.object.ai.craft.domain.user.model.User;
-import com.object.ai.craft.domain.user.service.UserService;
 import com.object.ai.craft.types.common.PageResult;
-import com.object.ai.craft.types.exception.ErrorCode;
-import com.object.ai.craft.types.exception.ThrowUtil;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
 
 /**
- * 应用领域服务。
+ * 应用领域服务，负责应用的创建、个人管理、精选展示和管理员管理。
  */
-@Service
-@RequiredArgsConstructor
-public class AppService {
+public interface AppService {
 
-    private static final String DEFAULT_APP_NAME = "未命名应用";
+    /**
+     * 为当前登录用户创建应用。
+     *
+     * <p>未提供有效应用名称时使用默认名称，并将当前登录用户设置为创建者。</p>
+     *
+     * @param request 应用创建请求
+     * @return 已持久化的应用
+     * @throws com.object.ai.craft.types.exception.BusinessException 当前用户未登录或应用创建失败时抛出
+     */
+    App create(AppAddRequest request);
 
-    private final AppRepository appRepository;
-    private final UserService userService;
+    /**
+     * 更新当前登录用户拥有的应用名称。
+     *
+     * @param request 应用更新请求
+     * @return {@code true} 表示更新成功
+     * @throws com.object.ai.craft.types.exception.BusinessException 应用不存在、用户未登录或无权操作时抛出
+     */
+    boolean updateMy(AppUpdateRequest request);
 
-    public App create(AppAddRequest request) {
-        User loginUser = userService.getLoginUser();
-        App app = App.builder()
-                .appName(hasText(request.getAppName()) ? request.getAppName() : DEFAULT_APP_NAME)
-                .initPrompt(request.getInitPrompt())
-                .priority(0)
-                .userId(loginUser.getId())
-                .build();
-        ThrowUtil.throwIf(!appRepository.save(app), ErrorCode.SYSTEM_ERROR, "应用创建失败");
-        App savedApp = appRepository.getById(app.getId());
-        ThrowUtil.throwIfNull(savedApp, ErrorCode.SYSTEM_ERROR);
-        return savedApp;
-    }
+    /**
+     * 删除当前登录用户拥有的应用。
+     *
+     * @param id 应用主键
+     * @return {@code true} 表示删除成功
+     * @throws com.object.ai.craft.types.exception.BusinessException 应用不存在、用户未登录或无权操作时抛出
+     */
+    boolean removeMy(String id);
 
-    public boolean updateMy(AppUpdateRequest request) {
-        App app = getMyApp(request.getId());
-        app.setAppName(request.getAppName());
-        app.setEditTime(LocalDateTime.now());
-        return appRepository.updateById(app);
-    }
+    /**
+     * 获取当前登录用户拥有的应用详情。
+     *
+     * @param id 应用主键
+     * @return 应用详情
+     * @throws com.object.ai.craft.types.exception.BusinessException 应用不存在、用户未登录或无权查看时抛出
+     */
+    App getMyById(String id);
 
-    public boolean removeMy(String id) {
-        getMyApp(id);
-        return appRepository.removeById(id);
-    }
+    /**
+     * 分页查询当前登录用户创建的应用。
+     *
+     * @param request 分页查询条件
+     * @return 当前用户的应用分页结果
+     * @throws com.object.ai.craft.types.exception.BusinessException 当前用户未登录时抛出
+     */
+    PageResult<App> pageMy(AppPageRequest request);
 
-    public App getMyById(String id) {
-        return getMyApp(id);
-    }
+    /**
+     * 分页查询对外展示的精选应用。
+     *
+     * @param request 分页查询条件
+     * @return 精选应用分页结果
+     */
+    PageResult<App> pageFeatured(AppPageRequest request);
 
-    public PageResult<App> pageMy(AppPageRequest request) {
-        return appRepository.pageMy(request, userService.getLoginUser().getId());
-    }
+    /**
+     * 由管理员更新应用的名称、封面或优先级。
+     *
+     * @param request 管理员更新请求
+     * @return {@code true} 表示更新成功
+     * @throws com.object.ai.craft.types.exception.BusinessException 没有待更新字段、名称为空或应用不存在时抛出
+     */
+    boolean updateByAdmin(AppAdminUpdateRequest request);
 
-    public PageResult<App> pageFeatured(AppPageRequest request) {
-        return appRepository.pageFeatured(request);
-    }
+    /**
+     * 由管理员删除指定应用。
+     *
+     * @param id 应用主键
+     * @return {@code true} 表示删除成功
+     * @throws com.object.ai.craft.types.exception.BusinessException 应用不存在时抛出
+     */
+    boolean removeByAdmin(String id);
 
-    public boolean updateByAdmin(AppAdminUpdateRequest request) {
-        ThrowUtil.throwIf(request.getAppName() == null && request.getCover() == null && request.getPriority() == null,
-                ErrorCode.PARAMS_ERROR, "至少填写一个待更新字段");
-        ThrowUtil.throwIf(request.getAppName() != null && !hasText(request.getAppName()),
-                ErrorCode.PARAMS_ERROR, "应用名称不能为空");
-        App app = getByIdForAdmin(request.getId());
-        if (request.getAppName() != null) {
-            app.setAppName(request.getAppName());
-        }
-        if (request.getCover() != null) {
-            app.setCover(request.getCover());
-        }
-        if (request.getPriority() != null) {
-            app.setPriority(request.getPriority());
-        }
-        app.setEditTime(LocalDateTime.now());
-        return appRepository.updateById(app);
-    }
+    /**
+     * 获取应用详情，包含逻辑删除的记录，供管理员管理使用。
+     *
+     * @param id 应用主键
+     * @return 应用详情
+     * @throws com.object.ai.craft.types.exception.BusinessException 应用不存在时抛出
+     */
+    App getByIdForAdmin(String id);
 
-    public boolean removeByAdmin(String id) {
-        ThrowUtil.throwIfNull(appRepository.getById(id), ErrorCode.NOT_FOUND_ERROR);
-        return appRepository.removeById(id);
-    }
-
-    public App getByIdForAdmin(String id) {
-        App app = appRepository.getByIdIncludeDeleted(id);
-        ThrowUtil.throwIfNull(app, ErrorCode.NOT_FOUND_ERROR);
-        return app;
-    }
-
-    public PageResult<App> pageByAdmin(AppAdminPageRequest request) {
-        return appRepository.pageAdmin(request);
-    }
-
-    private App getMyApp(String id) {
-        User loginUser = userService.getLoginUser();
-        App app = appRepository.getById(id);
-        ThrowUtil.throwIfNull(app, ErrorCode.NOT_FOUND_ERROR);
-        ThrowUtil.throwIf(!app.getUserId().equals(loginUser.getId()),
-                ErrorCode.FORBIDDEN_ERROR, "无权操作该应用");
-        return app;
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
+    /**
+     * 分页查询管理员可管理的全部应用。
+     *
+     * @param request 管理员分页查询条件
+     * @return 应用分页结果
+     */
+    PageResult<App> pageByAdmin(AppAdminPageRequest request);
 
 }

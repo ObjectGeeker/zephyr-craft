@@ -12,6 +12,7 @@ import com.object.ai.craft.types.common.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -52,6 +53,18 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public List<User> list() {
         return userMapper.selectAll().stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<User> listByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return userMapper.selectListByQuery(
+                        QueryWrapper.create().in(UserPO::getId, ids)
+                ).stream()
                 .map(this::toDomain)
                 .toList();
     }

@@ -7,6 +7,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.object.ai.craft.api.model.app.AppAdminPageRequest;
 import com.object.ai.craft.api.model.app.AppPageRequest;
 import com.object.ai.craft.domain.app.model.App;
+import com.object.ai.craft.domain.app.model.AppPriority;
 import com.object.ai.craft.domain.app.repository.AppRepository;
 import com.object.ai.craft.infrastructure.persistence.mapper.AppMapper;
 import com.object.ai.craft.infrastructure.persistence.po.AppPO;
@@ -68,7 +69,7 @@ public class AppRepositoryImpl implements AppRepository {
     @Override
     public PageResult<App> pageFeatured(AppPageRequest request) {
         QueryWrapper queryWrapper = QueryWrapper.create()
-                .gt(AppPO::getPriority, 0)
+                .eq(AppPO::getPriority, AppPriority.FEATURED)
                 .like(AppPO::getAppName, request.getAppName(), value -> value != null && !value.isBlank())
                 .orderBy(AppPO::getPriority, false)
                 .orderBy(AppPO::getEditTime, false);

@@ -4,6 +4,7 @@ import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.types.common.PageRequest;
 import com.object.ai.craft.types.common.PageResult;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -51,6 +52,14 @@ public interface UserRepository {
      * @return 用户列表
      */
     List<User> list();
+
+    /**
+     * 根据主键批量查询用户。
+     *
+     * @param ids 用户主键集合
+     * @return 用户列表
+     */
+    List<User> listByIds(Collection<String> ids);
 
     /**
      * 根据主键获取用户

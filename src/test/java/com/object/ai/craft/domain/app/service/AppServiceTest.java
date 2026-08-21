@@ -4,7 +4,9 @@ import com.object.ai.craft.api.model.app.AppAddRequest;
 import com.object.ai.craft.api.model.app.AppAdminUpdateRequest;
 import com.object.ai.craft.api.model.app.AppUpdateRequest;
 import com.object.ai.craft.domain.app.model.App;
+import com.object.ai.craft.domain.app.model.AppPriority;
 import com.object.ai.craft.domain.app.repository.AppRepository;
+import com.object.ai.craft.domain.app.service.impl.AppServiceImpl;
 import com.object.ai.craft.domain.user.model.User;
 import com.object.ai.craft.domain.user.service.UserService;
 import com.object.ai.craft.types.exception.BusinessException;
@@ -38,7 +40,7 @@ class AppServiceTest {
     private UserService userService;
 
     @InjectMocks
-    private AppService appService;
+    private AppServiceImpl appService;
 
     @Test
     void createShouldUseDefaultNameAndCurrentUser() {
@@ -58,7 +60,7 @@ class AppServiceTest {
         verify(appRepository).save(captor.capture());
         assertEquals("未命名应用", captor.getValue().getAppName());
         assertEquals("user-1", captor.getValue().getUserId());
-        assertEquals(0, captor.getValue().getPriority());
+        assertEquals(AppPriority.NORMAL, captor.getValue().getPriority());
         assertEquals("app-1", result.getId());
     }
 

@@ -1,6 +1,8 @@
 package com.object.ai.craft.api.model.app;
 
 import com.object.ai.craft.domain.app.model.App;
+import com.object.ai.craft.domain.user.model.User;
+import com.object.ai.craft.api.model.user.UserVO;
 import lombok.Builder;
 import lombok.Data;
 
@@ -27,7 +29,16 @@ public class AppVO {
     private LocalDateTime updateTime;
     private Integer isDelete;
 
+    /**
+     * 创建者的脱敏用户信息。
+     */
+    private UserVO user;
+
     public static AppVO from(App app) {
+        return from(app, null);
+    }
+
+    public static AppVO from(App app, User user) {
         if (app == null) {
             return null;
         }
@@ -45,6 +56,7 @@ public class AppVO {
                 .createTime(app.getCreateTime())
                 .updateTime(app.getUpdateTime())
                 .isDelete(app.getIsDelete())
+                .user(UserVO.from(user))
                 .build();
     }
 
@@ -52,7 +64,11 @@ public class AppVO {
      * 精选列表不暴露其他用户的初始化提示词。
      */
     public static AppVO fromFeatured(App app) {
-        AppVO appVO = from(app);
+        return fromFeatured(app, null);
+    }
+
+    public static AppVO fromFeatured(App app, User user) {
+        AppVO appVO = from(app, user);
         if (appVO != null) {
             appVO.setInitPrompt(null);
         }

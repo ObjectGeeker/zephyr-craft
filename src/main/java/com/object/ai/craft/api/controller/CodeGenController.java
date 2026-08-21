@@ -16,7 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 /**
  * AI 代码生成接口。
  */
-@Tag(name = "AI 代码生成")
+@Tag(name = "AI 代码生成", description = "根据自然语言需求流式生成网站代码")
 @RestController
 @RequestMapping("/codegen")
 @RequiredArgsConstructor
@@ -32,7 +32,7 @@ public class CodeGenController {
     /**
      * 流式生成代码，通过 SSE 推送生成过程。
      */
-    @Operation(summary = "流式生成代码（SSE）")
+    @Operation(summary = "流式生成代码（SSE）", description = "以 SSE 事件持续返回代码片段、完成结果或错误信息")
     @PostMapping(value = "generateStream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter generateStream(@Valid @RequestBody CodeGenRequest request) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
