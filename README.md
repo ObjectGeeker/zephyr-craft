@@ -25,7 +25,7 @@
 zephyr-craft/
 ├── src/main/java/com/object/ai/craft/   # 后端源码
 │   ├── api/                             # 接口层（Controller、全局异常处理）
-│   ├── app/                             # 应用配置（Knife4j、CORS）
+│   ├── appPO/                             # 应用配置（Knife4j、CORS）
 │   ├── domain/                          # 领域层（模型、服务、仓库接口）
 │   ├── infrastructure/                  # 基础设施层（持久化实现）
 │   ├── types/                           # 通用类型（响应、异常）
